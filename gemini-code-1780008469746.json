@@ -1,0 +1,76 @@
+{
+  "task_id": "task_20260528_cheetah",
+  "title": "Watch 'Saving Cheetahs | Returning to Cheetah Conservation Fund' with Sandra",
+  "description": "Educational vlog by zoologist Lindsay Nikole returning to the Cheetah Conservation Fund (CCF) in Namibia after 6 years. Key focuses: human-wildlife conflict mitigation, livestock guarding dogs, orphan care, and ecology tracking.",
+  "status": "TODO",
+  "priority": "HIGH",
+  "created_at": "2026-05-28T22:45:00Z",
+  "due_date": "2026-06-05T19:30:00Z",
+  "completed_at": null,
+  
+  "collaborators": [
+    {
+      "user_id": "user_01",
+      "name": "Sandra",
+      "role": "Co-watcher",
+      "status": "INVITED"
+    }
+  ],
+  
+  "attachment_type": "VIDEO_LINK",
+  "media_metadata": {
+    "platform": "YouTube",
+    "original_url": "https://youtu.be/TStDUEBNGCM?si=5cSDsE9M9U8vYaeH",
+    "video_id": "TStDUEBNGCM",
+    "title": "Saving Cheetahs | Returning to Cheetah Conservation Fund | Lindsay Nikole",
+    "creator_or_channel": "Lindsay Nikole",
+    "publish_date": "2025-08-28",
+    "duration_iso_8601": "PT46M1S",
+    "duration_seconds": 2761,
+    "thumbnail_url": "https://i.ytimg.com/vi/TStDUEBNGCM/maxresdefault.jpg",
+    "metrics_at_creation": {
+      "view_count": 138052,
+      "like_count": 15092
+    }
+  },
+  
+  "task_specific_tags": [
+    "Zoology",
+    "Wildlife Conservation",
+    "Namibia",
+    "Documentary"
+  ],
+  
+  "curated_video_bookmarks": [
+    {
+      "timestamp": "[00:04:55]",
+      "label": "Interview with Dr. Laurie Marker (CCF Founder)",
+      "note": "Discusses how the wild population has dropped below 7,000 globally."
+    },
+    {
+      "timestamp": "[00:06:15]",
+      "label": "The Livestock Guarding Dog Program",
+      "note": "Explains how Anatolian Shepherds and Kangals protect herds and drastically reduce cheetah conflict by 80-100%."
+    },
+    {
+      "timestamp": "[00:08:25]",
+      "label": "Three Core Rules of Livestock Management",
+      "note": "Covers Fencing, Animal Health, and Seasonal Breeding strategies taught to local farmers."
+    },
+    {
+      "timestamp": "[00:19:25]",
+      "label": "Cheetah Meat Prep & 'Predator Powder'",
+      "note": "How the CCF feeds orphan cheetahs clean meat with added essential nutrient supplements."
+    },
+    {
+      "timestamp": "[00:24:45]",
+      "label": "Release Candidates Criteria",
+      "note": "Spotlight on cheetahs Atango and Zephyr, showing why natural human aversion and spitting are great indicators for a successful return to the wild."
+    }
+  ],
+  
+  "app_features_placeholder": {
+    "enable_reminders": true,
+    "user_notes": "Great option for an evening documentary night. Length is roughly 46 minutes."
+  }
+}

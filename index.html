@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChromaTask — Full-Stack Audit Task Board</title>
+    <!-- Modern Premium Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <!-- App Container -->
+    <div class="app-container">
+      <!-- Sidebar -->
+      <aside class="app-sidebar" id="app-sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="url(#brand-grad)" stroke="url(#brand-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <defs>
+                <linearGradient id="brand-grad" x1="3" y1="2" x2="21" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#38bdf8" />
+                  <stop offset="1" stop-color="#a855f7" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <span class="brand-name">ChromaTask</span>
+        </div>
+
+        <nav class="sidebar-nav">
+          <div class="nav-section">
+            <span class="nav-section-title">Navigation</span>
+            <button class="nav-item active" id="nav-all">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+              <span>Dashboard</span>
+            </button>
+            <button class="nav-item" id="nav-archive">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>Archive & History</span>
+            </button>
+          </div>
+
+          <div class="nav-section-filters" id="sidebar-filters-section">
+            <div class="nav-section">
+              <span class="nav-section-title">Priority Filters</span>
+              <button class="nav-item filter-btn" data-filter="priority-HIGH" id="filter-high">
+                <span class="indicator-dot high"></span>
+                <span>High Priority</span>
+              </button>
+              <button class="nav-item filter-btn" data-filter="priority-MEDIUM" id="filter-med">
+                <span class="indicator-dot medium"></span>
+                <span>Medium Priority</span>
+              </button>
+              <button class="nav-item filter-btn" data-filter="priority-LOW" id="filter-low">
+                <span class="indicator-dot low"></span>
+                <span>Low Priority</span>
+              </button>
+            </div>
+
+            <div class="nav-section">
+              <span class="nav-section-title">Tags</span>
+              <div class="sidebar-tags" id="sidebar-tags-container">
+                <!-- Dynamically populated tags -->
+              </div>
+            </div>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button class="btn btn-danger btn-full" id="btn-reset-db">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+            <span>Reset Database</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- Main Dashboard -->
+      <main class="app-main">
+        <header class="app-header">
+          <div class="header-left">
+            <h1 class="header-title" id="page-title">Workspace</h1>
+            <p class="header-subtitle" id="task-metrics-summary">Loading tasks...</p>
+          </div>
+          <div class="header-right">
+            <div class="search-box" id="header-search-box">
+              <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="search-input" placeholder="Search tasks, descriptions..." />
+            </div>
+            <button class="btn btn-primary" id="btn-add-task">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              <span>New Task</span>
+            </button>
+          </div>
+        </header>
+
+        <!-- Board Layout -->
+        <div class="board-container" id="board-container">
+          <!-- Column: TODO -->
+          <div class="board-column" data-status="TODO" id="column-todo">
+            <div class="column-header">
+              <div class="column-title-wrapper">
+                <span class="indicator-dot status-todo"></span>
+                <h2>To Do</h2>
+              </div>
+              <span class="column-count" id="count-todo">0</span>
+            </div>
+            <div class="column-cards" id="cards-todo" data-status="TODO">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+
+          <!-- Column: IN PROGRESS -->
+          <div class="board-column" data-status="IN_PROGRESS" id="column-in-progress">
+            <div class="column-header">
+              <div class="column-title-wrapper">
+                <span class="indicator-dot status-progress"></span>
+                <h2>In Progress</h2>
+              </div>
+              <span class="column-count" id="count-in-progress">0</span>
+            </div>
+            <div class="column-cards" id="cards-in-progress" data-status="IN_PROGRESS">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+
+          <!-- Column: COMPLETED -->
+          <div class="board-column" data-status="COMPLETED" id="column-completed">
+            <div class="column-header">
+              <div class="column-title-wrapper">
+                <span class="indicator-dot status-completed"></span>
+                <h2>Completed</h2>
+              </div>
+              <span class="column-count" id="count-completed">0</span>
+            </div>
+            <div class="column-cards" id="cards-completed" data-status="COMPLETED">
+              <!-- Cards dynamically inserted -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Archive List Layout (Hidden by default) -->
+        <div class="archive-container" id="archive-container" style="display: none;">
+          <div class="archive-header-row">
+            <div class="archive-header-left">
+              <h2>Archived & Deleted Tasks</h2>
+              <p>A history of all tasks that have been created and deleted. You can inspect their timeline or restore them back to the active board.</p>
+            </div>
+          </div>
+          <div class="archive-table-wrapper">
+            <table class="archive-table">
+              <thead>
+                <tr>
+                  <th>Task Title</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Deleted At</th>
+                  <th style="text-align: right; padding-right: 24px;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="archive-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- Task Detail Slider Panel (Right-side drawer) -->
+      <aside class="detail-drawer" id="detail-drawer">
+        <div class="drawer-header">
+          <div class="drawer-header-left">
+            <span class="badge badge-core" id="detail-core-badge" style="display: none;">Seed Task</span>
+            <span class="badge" id="detail-priority-badge">HIGH</span>
+          </div>
+          <button class="drawer-close-btn" id="drawer-close" aria-label="Close details">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="drawer-content" id="drawer-content-body">
+          <div class="drawer-section">
+            <h2 class="detail-title" id="detail-title" contenteditable="true">Task Title</h2>
+            <div class="detail-meta-grid">
+              <div class="meta-item">
+                <span class="meta-label">Status</span>
+                <select class="select-styled" id="detail-status-select">
+                  <option value="TODO">To Do</option>
+                  <option value="IN_PROGRESS">In Progress</option>
+                  <option value="COMPLETED">Completed</option>
+                </select>
+              </div>
+              <div class="meta-item">
+                <span class="meta-label">Due Date</span>
+                <input type="datetime-local" class="input-styled" id="detail-due-date" />
+              </div>
+            </div>
+          </div>
+
+          <div class="drawer-section">
+            <h3 class="section-subtitle">Description</h3>
+            <textarea class="textarea-styled" id="detail-description" placeholder="Add a description..."></textarea>
+          </div>
+
+          <!-- Video Link Section (Only shows if task has video metadata) -->
+          <div class="drawer-section video-section" id="drawer-video-section">
+            <h3 class="section-subtitle">Attachment: Video Lecture</h3>
+            <div class="video-container-wrapper">
+              <div id="yt-player-container"></div>
+            </div>
+            <div class="video-meta-box">
+              <h4 id="video-title" class="video-meta-title">Video Title</h4>
+              <p id="video-creator" class="video-meta-creator">By Lindsay Nikole</p>
+              <div class="video-stats">
+                <span id="video-duration">Duration: 46:01</span>
+                <span id="video-views">Views: 138K</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bookmarks Section (Only shows if task has bookmarks) -->
+          <div class="drawer-section bookmarks-section" id="drawer-bookmarks-section">
+            <div class="section-header-row">
+              <h3 class="section-subtitle">Video Bookmarks</h3>
+              <button class="btn-text" id="btn-add-bookmark">+ Add Bookmark</button>
+            </div>
+            <p class="section-instructions">Click timestamps to jump to that moment in the video lecture.</p>
+            <div class="bookmarks-list" id="bookmarks-list-container">
+              <!-- Bookmark items dynamically populated -->
+            </div>
+          </div>
+
+          <!-- Collaborators Section -->
+          <div class="drawer-section collaborators-section" id="drawer-collaborators-section">
+            <div class="section-header-row">
+              <h3 class="section-subtitle">Collaborators</h3>
+              <button class="btn-text" id="btn-add-collaborator">+ Invite</button>
+            </div>
+            <div class="collaborators-list" id="collaborators-list-container">
+              <!-- Collaborator items -->
+            </div>
+          </div>
+
+          <!-- Tags Section -->
+          <div class="drawer-section tags-section">
+            <h3 class="section-subtitle">Tags</h3>
+            <div class="detail-tags-list" id="detail-tags-container">
+              <!-- Tags list -->
+            </div>
+            <div class="tag-input-row">
+              <input type="text" id="new-tag-input" placeholder="Add tag..." class="input-styled input-sm" />
+              <button class="btn btn-secondary btn-sm" id="btn-add-tag">Add</button>
+            </div>
+          </div>
+
+          <!-- Activity Log (Audit Trail Timeline) -->
+          <div class="drawer-section activity-log-section">
+            <h3 class="section-subtitle">Activity Log / Audit Trail</h3>
+            <div class="timeline-container" id="detail-timeline-container">
+              <!-- Timeline items populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Footer Actions inside Drawer -->
+          <div class="drawer-footer-actions">
+            <button class="btn btn-danger btn-full" id="btn-delete-task">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+              <span>Delete Task</span>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Task Creator / Editor Dialog Modal -->
+      <div class="modal-overlay" id="task-modal">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h2 class="modal-title" id="modal-title-text">Create Task</h2>
+            <button class="modal-close-btn" id="modal-close">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <form id="task-form" class="modal-form">
+            <div class="form-group">
+              <label for="form-title" class="form-label">Title *</label>
+              <input type="text" id="form-title" class="input-styled" required placeholder="e.g. Analyze CCF release candidates" />
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="form-priority" class="form-label">Priority</label>
+                <select id="form-priority" class="select-styled">
+                  <option value="LOW">Low</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="HIGH" selected>High</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="form-due" class="form-label">Due Date</label>
+                <input type="datetime-local" id="form-due" class="input-styled" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="form-desc" class="form-label">Description</label>
+              <textarea id="form-desc" class="textarea-styled" rows="3" placeholder="Describe the task expectations..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="form-video" class="form-label">YouTube URL (Optional)</label>
+              <input type="url" id="form-video" class="input-styled" placeholder="e.g. https://www.youtube.com/watch?v=..." />
+            </div>
+
+            <div class="form-group">
+              <label for="form-tags" class="form-label">Tags (comma separated)</label>
+              <input type="text" id="form-tags" class="input-styled" placeholder="e.g. Wildlife, Research, Namibia" />
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" id="form-cancel">Cancel</button>
+              <button type="submit" class="btn btn-primary" id="form-submit-btn">Create Task</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Add Collaborator Small Dialog -->
+      <div class="modal-overlay" id="collaborator-modal">
+        <div class="modal-box modal-sm">
+          <div class="modal-header">
+            <h2 class="modal-title">Invite Collaborator</h2>
+            <button class="modal-close-btn" id="collab-close-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <form id="collaborator-form" class="modal-form">
+            <div class="form-group">
+              <label for="collab-name" class="form-label">Name *</label>
+              <input type="text" id="collab-name" class="input-styled" required placeholder="Sandra" />
+            </div>
+            <div class="form-group">
+              <label for="collab-role" class="form-label">Role *</label>
+              <input type="text" id="collab-role" class="input-styled" required placeholder="Co-watcher" />
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" id="collab-cancel-btn">Cancel</button>
+              <button type="submit" class="btn btn-primary">Invite</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Add Bookmark Small Dialog -->
+      <div class="modal-overlay" id="bookmark-modal">
+        <div class="modal-box modal-sm">
+          <div class="modal-header">
+            <h2 class="modal-title">Add Bookmark</h2>
+            <button class="modal-close-btn" id="bookmark-close-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <form id="bookmark-form" class="modal-form">
+            <div class="form-group">
+              <label for="bookmark-time" class="form-label">Timestamp (MM:SS or HH:MM:SS) *</label>
+              <input type="text" id="bookmark-time" class="input-styled" required placeholder="e.g. 06:15" pattern="^(\d{1,2}:)?\d{1,2}:\d{2}$" />
+            </div>
+            <div class="form-group">
+              <label for="bookmark-label" class="form-label">Label *</label>
+              <input type="text" id="bookmark-label" class="input-styled" required placeholder="e.g. Livestock Dog Program" />
+            </div>
+            <div class="form-group">
+              <label for="bookmark-note" class="form-label">Note (Optional)</label>
+              <input type="text" id="bookmark-note" class="input-styled" placeholder="Brief note about this timestamp" />
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" id="bookmark-cancel-btn">Cancel</button>
+              <button type="submit" class="btn btn-primary">Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- YouTube IFrame Player API -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <!-- App Script -->
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
