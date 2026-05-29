@@ -6,7 +6,7 @@
   "scripts": {
     "server": "python3 server.py",
     "client": "vite",
-    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev": "npm run server & npm run client",
     "build": "vite build",
     "preview": "vite preview"
   },
