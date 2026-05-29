@@ -616,3 +616,26 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertEqual(rollback_resp.status_code, 200)
         self.assertEqual(rollback_resp.get_json()["title"], "Original")
 
+    def test_sync_dynamic_docs_endpoint(self) -> None:
+        """Verifies POST /api/docs/sync executes the dynamic document compiler."""
+        # Call the sync endpoint
+        sync_resp = self.client.post("/api/docs/sync")
+        self.assertEqual(sync_resp.status_code, 200)
+        self.assertEqual(sync_resp.get_json()["status"], "success")
+
+        # Fetch architecture guide to verify API Reference section was compiled
+        arch_resp = self.client.get("/api/docs/guides/architecture")
+        self.assertEqual(arch_resp.status_code, 200)
+        arch_content = arch_resp.get_json()["content"]
+        self.assertIn("Programmatic API Reference", arch_content)
+        self.assertIn("PythonCodeAnalyzer", arch_content)
+        self.assertIn("BaseCodeAnalyzer", arch_content)
+
+        # Fetch testing guide to verify Codebase Health & Test scorecard was compiled
+        test_resp = self.client.get("/api/docs/guides/testing")
+        self.assertEqual(test_resp.status_code, 200)
+        test_content = test_resp.get_json()["content"]
+        self.assertIn("Codebase Health & Test Execution Scorecard", test_content)
+        self.assertIn("Codebase Quality Score", test_content)
+
+

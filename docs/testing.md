@@ -62,3 +62,59 @@ The Dev Docs & Health console is backed by the following server routes:
   - Retrieves the latest compiled test execution stats and results.
 - **Metrics Polling**: `GET /api/docs/tests/metrics/<metric_name>`
   - Allows polling specific execution parameters individually: `total`, `passed`, `failed`, `success_rate`, `duration`, or `timestamp`.
+
+---
+
+## 4. Codebase Health & Test Execution Scorecard
+
+<!-- DYNAMIC_HEALTH_SCORECARD_START -->
+### 🛡️ Codebase Quality Score: **100%**
+- **Files Scanned**: 8 files
+
+#### Active Linter Warnings
+| File | Line | Severity | Scope | Violation Details |
+| :--- | :--- | :--- | :--- | :--- |
+| `doc_service.py` | 561 | `INFO` | `CSSCodeAnalyzer._scan_warnings` | Method '_scan_warnings' is very long (86 lines). Consider splitting it. |
+
+#### Unit & Integration Tests scorecard
+- **Success Rate**: **100%** (33/33 passed, 0 failed)
+- **Test Execution Duration**: 0.3951s
+
+| Test Class | Test Case Method | Status | Duration | Message |
+| :--- | :--- | :--- | :--- | :--- |
+| `AnalyzerStrategyTests` | `test_css_analyzer_violations` | `PASS` | 0.0019s | Passed successfully. |
+| `AnalyzerStrategyTests` | `test_html_analyzer_violations` | `PASS` | 0.0005s | Passed successfully. |
+| `AnalyzerStrategyTests` | `test_js_analyzer_violations` | `PASS` | 0.001s | Passed successfully. |
+| `CodebaseQualityTests` | `test_css_quality` | `PASS` | 0.0107s | Passed successfully. |
+| `CodebaseQualityTests` | `test_html_quality` | `PASS` | 0.0025s | Passed successfully. |
+| `CodebaseQualityTests` | `test_javascript_quality` | `PASS` | 0.007s | Passed successfully. |
+| `DocServiceTests` | `test_doc_service_registration_and_analysis` | `PASS` | 0.0004s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_create_task_endpoint` | `PASS` | 0.0078s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_delete_and_restore_endpoints` | `PASS` | 0.0014s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_get_docs_commits_endpoint` | `PASS` | 0.0174s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_get_docs_guides_endpoints` | `PASS` | 0.0867s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_get_docs_health_endpoint` | `PASS` | 0.018s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_get_docs_metadata_endpoint` | `PASS` | 0.0243s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_get_task_by_id_endpoint` | `PASS` | 0.0017s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_get_tasks_endpoint` | `PASS` | 0.0004s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_reconstruction_and_rollback_endpoints` | `PASS` | 0.0021s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_reset_database_endpoint` | `PASS` | 0.0012s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_sync_dynamic_docs_endpoint` | `PASS` | 0.1255s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_task_history_endpoint` | `PASS` | 0.0014s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_test_suite_and_metrics_endpoints` | `PASS` | 0.0429s | Passed successfully. |
+| `FlaskAPIAdditionalTests` | `test_update_task_endpoint` | `PASS` | 0.0027s | Passed successfully. |
+| `FlaskAPITests` | `test_create_task_endpoint` | `PASS` | 0.0017s | Passed successfully. |
+| `FlaskAPITests` | `test_get_docs_health_endpoint` | `PASS` | 0.0252s | Passed successfully. |
+| `FlaskAPITests` | `test_get_tasks_endpoint` | `PASS` | 0.0009s | Passed successfully. |
+| `FlaskAPITests` | `test_update_task_endpoint` | `PASS` | 0.0012s | Passed successfully. |
+| `RepositoryTests` | `test_database_context_locking_and_crud` | `PASS` | 0.0004s | Passed successfully. |
+| `TaskModelTests` | `test_task_creation_and_defaults` | `PASS` | 0.0s | Passed successfully. |
+| `TaskModelTests` | `test_task_field_update_diffs` | `PASS` | 0.0s | Passed successfully. |
+| `TaskModelTests` | `test_task_serialization` | `PASS` | 0.0s | Passed successfully. |
+| `TaskModelTests` | `test_task_soft_delete_and_restore` | `PASS` | 0.0s | Passed successfully. |
+| `TaskServiceTests` | `test_create_and_update_task_service` | `PASS` | 0.0018s | Passed successfully. |
+| `TaskServiceTests` | `test_time_travel_reconstruction_and_rollback` | `PASS` | 0.0024s | Passed successfully. |
+| `TestRunnerServiceTests` | `test_test_runner_cache_and_scope` | `PASS` | 0.0026s | Passed successfully. |
+
+<!-- DYNAMIC_HEALTH_SCORECARD_END -->
+

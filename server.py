@@ -261,6 +261,7 @@ def get_test_results() -> Any:
         results = test_runner_service.get_last_results()
         if not results:
             results = test_runner_service.run_tests()
+            code_doc_service.sync_dynamic_docs(results)
         return jsonify(results), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -280,7 +281,20 @@ def run_test_suite() -> Any:
             if payload:
                 scope = payload.get("scope")
         results = test_runner_service.run_tests(scope)
+        code_doc_service.sync_dynamic_docs(results)
         return jsonify(results), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/docs/sync", methods=["POST"])
+def sync_docs_endpoint() -> Any:
+    """
+    Forces a manual synchronization of dynamic documentation sections.
+    """
+    try:
+        code_doc_service.sync_dynamic_docs()
+        return jsonify({"status": "success", "message": "Dynamic documentation updated successfully."}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -354,5 +368,9 @@ def add_header(response: Any) -> Any:
 
 if __name__ == "__main__":
     initialize_database()
+    try:
+        code_doc_service.sync_dynamic_docs()
+    except Exception as e:
+        print(f"Failed to perform startup dynamic docs sync: {e}")
     # Run server locally on port 5000
     app.run(host="127.0.0.1", port=5000, debug=True)

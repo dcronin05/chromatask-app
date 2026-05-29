@@ -783,6 +783,7 @@ class DocService:
         """
         self.project_path: str = project_path
         self._analyzers: Dict[str, Type[BaseCodeAnalyzer]] = {}
+        self.last_synced_commit: Optional[str] = None
 
     def register_analyzer(self, ext: str, analyzer_class: Type[BaseCodeAnalyzer]) -> None:
         """Registers a BaseCodeAnalyzer subclass for a specific file extension."""
@@ -858,13 +859,200 @@ class DocService:
             "files_reports": reports
         }
 
+    def _generate_api_reference_md(self, report: Dict[str, Any]) -> str:
+        """
+        Generates API Reference markdown from codebase static analysis report.
+        """
+        md_lines = []
+        md_lines.append("The following reference lists all modules, classes, and public functions detected programmatically via AST:")
+        md_lines.append("")
+        for r in report.get("files_reports", []):
+            file_path = r.get("file_path", "")
+            meta = r.get("metadata", {})
+            classes = meta.get("classes", [])
+            stats = meta.get("stats", {})
+            md_lines.append(f"### 📂 [{os.path.basename(file_path)}](file://{os.path.abspath(os.path.join(self.project_path, file_path))})")
+            md_lines.append(f"- **Lines of Code**: {stats.get('lines', 0)} | **Comments**: {stats.get('comments', 0)}")
+            md_lines.append("")
+            if not classes:
+                md_lines.append("*No classes or global helper functions detected in this file.*")
+                md_lines.append("")
+                continue
+            for c in classes:
+                c_name = c.get("name", "")
+                c_doc = c.get("docstring", "").strip() or "*No description provided.*"
+                md_lines.append(f"#### Class: `{c_name}`")
+                md_lines.append(f"> {c_doc}")
+                md_lines.append("")
+                methods = c.get("methods", [])
+                if methods:
+                    md_lines.append("| Method / Function | Arguments | Lines | Description |")
+                    md_lines.append("| :--- | :--- | :--- | :--- |")
+                    for m in methods:
+                        m_name = m.get("name", "")
+                        m_args = ", ".join(m.get("args", []))
+                        m_len = m.get("length", 0)
+                        m_doc = m.get("docstring", "").strip().split("\n")[0] or "*No description.*"
+                        md_lines.append(f"| `{m_name}` | `({m_args})` | {m_len} | {m_doc} |")
+                    md_lines.append("")
+            md_lines.append("---")
+            md_lines.append("")
+        return "\n".join(md_lines)
+
+    def _append_warnings_md(self, md_lines: List[str], warnings: List[Dict[str, Any]]) -> None:
+        """
+        Appends active warnings list formatted as a markdown table to md_lines.
+        """
+        md_lines.append("#### Active Linter Warnings")
+        if not warnings:
+            md_lines.append("> [!TIP]")
+            md_lines.append("> Codebase is 100% clean! Zero active style or annotation warnings.")
+            md_lines.append("")
+        else:
+            md_lines.append("| File | Line | Severity | Scope | Violation Details |")
+            md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+            for w in warnings:
+                f_name = w.get("file", "")
+                line = w.get("line", 1)
+                sev = w.get("severity", "WARNING")
+                scope = w.get("scope", "Global")
+                issue = w.get("issue", "")
+                md_lines.append(f"| `{f_name}` | {line} | `{sev}` | `{scope}` | {issue} |")
+            md_lines.append("")
+
+    def _append_test_results_md(self, md_lines: List[str], test_results: Optional[Dict[str, Any]]) -> None:
+        """
+        Appends unit test execution scorecard and results table to md_lines.
+        """
+        md_lines.append("#### Unit & Integration Tests scorecard")
+        if not test_results:
+            md_lines.append("*No unit test execution results available.*")
+            return
+        stats = test_results.get("stats", {})
+        rate = stats.get("success_rate", 100)
+        total = stats.get("total", 0)
+        passed = stats.get("passed", 0)
+        failed = stats.get("failed", 0)
+        dur = test_results.get("duration", 0.0)
+        md_lines.append(f"- **Success Rate**: **{rate}%** ({passed}/{total} passed, {failed} failed)")
+        md_lines.append(f"- **Test Execution Duration**: {dur}s")
+        md_lines.append("")
+        md_lines.append("| Test Class | Test Case Method | Status | Duration | Message |")
+        md_lines.append("| :--- | :--- | :--- | :--- | :--- |")
+        for t in test_results.get("results", []):
+            t_class = t.get("class", "")
+            t_name = t.get("name", "")
+            t_status = t.get("status", "PENDING")
+            t_dur = t.get("duration", 0.0)
+            t_msg = t.get("message", "").replace("\n", " ").strip()
+            if len(t_msg) > 60:
+                t_msg = t_msg[:57] + "..."
+            md_lines.append(f"| `{t_class}` | `{t_name}` | `{t_status}` | {t_dur}s | {t_msg} |")
+        md_lines.append("")
+
+    def _generate_health_scorecard_md(self, report: Dict[str, Any], test_results: Optional[Dict[str, Any]]) -> str:
+        """
+        Generates markdown scorecard summarizing code quality score, active warnings, and test runs.
+        """
+        md_lines = []
+        score = report.get("score", 100)
+        scanned = report.get("files_scanned", 0)
+        md_lines.append(f"### 🛡️ Codebase Quality Score: **{score}%**")
+        md_lines.append(f"- **Files Scanned**: {scanned} files")
+        md_lines.append("")
+        self._append_warnings_md(md_lines, report.get("warnings", []))
+        self._append_test_results_md(md_lines, test_results)
+        return "\n".join(md_lines)
+
+    def _replace_placeholder_in_file(self, file_path: str, start_marker: str, end_marker: str, content: str) -> None:
+        """
+        Replaces text between start and end markers inside a file with new content.
+        """
+        if not os.path.exists(file_path):
+            return
+        with open(file_path, "r", encoding="utf-8") as f:
+            file_content = f.read()
+        pattern = re.escape(start_marker) + r".*?" + re.escape(end_marker)
+        replacement = f"{start_marker}\n{content}\n{end_marker}"
+        new_content = re.sub(pattern, replacement, file_content, flags=re.DOTALL)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(new_content)
+
+    def _fetch_cached_test_results(self) -> Optional[Dict[str, Any]]:
+        """
+        Queries TestRunnerService to fetch the last run test results.
+        """
+        try:
+            from test_service import TestRunnerService
+            runner = TestRunnerService()
+            results = runner.get_last_results()
+            if not results:
+                runner._refresh_test_cache()
+                results = {
+                    "stats": {"total": len(runner.all_tests_cache), "passed": 0, "failed": 0, "success_rate": 0},
+                    "duration": 0.0,
+                    "results": list(runner.all_tests_cache.values())
+                }
+            return results
+        except Exception:
+            return None
+
+    def _get_current_git_commit(self) -> Optional[str]:
+        """
+        Returns the current git HEAD commit hash.
+        """
+        import subprocess
+        cmd = ["git", "rev-parse", "HEAD"]
+        res = subprocess.run(cmd, capture_output=True, text=True, cwd=self.project_path)
+        if res.returncode == 0:
+            return res.stdout.strip()
+        return None
+
+    def sync_dynamic_docs(self, test_results: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Regenerates API Reference and Health Scorecard markdown and writes them to placeholder markers.
+        """
+        files_list = [
+            "models.py", "repositories.py", "services.py", "server.py", "doc_service.py",
+            "src/main.js", "src/style.css", "index.html"
+        ]
+        report = self.analyze_project(files_list)
+        arch_md = self._generate_api_reference_md(report)
+        arch_path = os.path.join(self.project_path, "docs", "architecture.md")
+        self._replace_placeholder_in_file(
+            arch_path, 
+            "<!-- DYNAMIC_API_REFERENCE_START -->", 
+            "<!-- DYNAMIC_API_REFERENCE_END -->", 
+            arch_md
+        )
+        if not test_results:
+            test_results = self._fetch_cached_test_results()
+        health_md = self._generate_health_scorecard_md(report, test_results)
+        testing_path = os.path.join(self.project_path, "docs", "testing.md")
+        self._replace_placeholder_in_file(
+            testing_path, 
+            "<!-- DYNAMIC_HEALTH_SCORECARD_START -->", 
+            "<!-- DYNAMIC_HEALTH_SCORECARD_END -->", 
+            health_md
+        )
+        try:
+            self.last_synced_commit = self._get_current_git_commit()
+        except Exception:
+            pass
+
     def get_markdown_guide(self, guide_name: str, commit_hash: Optional[str] = None) -> str:
         """Retrieves and reads a static markdown documentation guide."""
+        if not commit_hash:
+            try:
+                curr_hash = self._get_current_git_commit()
+                if curr_hash and curr_hash != self.last_synced_commit:
+                    self.sync_dynamic_docs()
+            except Exception:
+                pass
         docs_dir: str = os.path.join(self.project_path, "docs")
         # Sanitize filename
         safe_name: str = re.sub(r"[^a-zA-Z0-9_\-]", "", guide_name)
         file_path: str = os.path.join(docs_dir, f"{safe_name}.md")
-        
         if commit_hash:
             import subprocess
             rel_path = os.path.relpath(file_path)
