@@ -956,9 +956,12 @@ async function renderDetailHistoryTimeline(taskId) {
               if (c.field === 'due_date') {
                 oldVal = oldVal ? formatDate(oldVal) : 'None';
                 newVal = newVal ? formatDate(newVal) : 'None';
-              } else if (typeof oldVal === 'object' || Array.isArray(oldVal)) {
-                oldVal = Array.isArray(oldVal) ? `${oldVal.length} items` : 'Updated';
-                newVal = Array.isArray(newVal) ? `${newVal.length} items` : 'Updated';
+              } else if (Array.isArray(oldVal) || Array.isArray(newVal)) {
+                oldVal = Array.isArray(oldVal) ? `${oldVal.length} items` : '0 items';
+                newVal = Array.isArray(newVal) ? `${newVal.length} items` : '0 items';
+              } else if ((oldVal && typeof oldVal === 'object') || (newVal && typeof newVal === 'object')) {
+                oldVal = oldVal ? 'Updated' : 'None';
+                newVal = newVal ? 'Updated' : 'None';
               }
               
               return `
@@ -1760,32 +1763,7 @@ function formatInlineDiff(changes) {
     let oldVal = c.old;
     let newVal = c.new;
     
-    if (Array.isArray(oldVal) || Array.isArray(newVal)) {
-      const oldArr = Array.isArray(oldVal) ? oldVal : [];
-      const newArr = Array.isArray(newVal) ? newVal : [];
-      
-      const removed = oldArr.filter(x => !newArr.includes(x));
-      const added = newArr.filter(x => !oldArr.includes(x));
-      const unchanged = oldArr.filter(x => newArr.includes(x));
-      
-      let diffHtml = '';
-      removed.forEach(r => {
-        diffHtml += `<span class="diff-val-box diff-deleted">#${r}</span> `;
-      });
-      added.forEach(a => {
-        diffHtml += `<span class="diff-val-box diff-added">#${a}</span> `;
-      });
-      unchanged.forEach(u => {
-        diffHtml += `<span class="diff-val-box diff-unchanged">#${u}</span> `;
-      });
-      
-      html += `
-        <div class="timeline-diff-row">
-          <span class="timeline-diff-field">${c.field.replace(/_/g, ' ')}</span>
-          <span class="timeline-diff-vals">${diffHtml || 'None'}</span>
-        </div>
-      `;
-    } else if (c.field === 'collaborators') {
+    if (c.field === 'collaborators') {
       const oldNames = (oldVal || []).map(col => `${col.name} (${col.role})`);
       const newNames = (newVal || []).map(col => `${col.name} (${col.role})`);
       
@@ -1829,6 +1807,31 @@ function formatInlineDiff(changes) {
         <div class="timeline-diff-row">
           <span class="timeline-diff-field">video bookmarks</span>
           <span class="timeline-diff-vals">${diffHtml || 'No changes'}</span>
+        </div>
+      `;
+    } else if (Array.isArray(oldVal) || Array.isArray(newVal)) {
+      const oldArr = Array.isArray(oldVal) ? oldVal : [];
+      const newArr = Array.isArray(newVal) ? newVal : [];
+      
+      const removed = oldArr.filter(x => !newArr.includes(x));
+      const added = newArr.filter(x => !oldArr.includes(x));
+      const unchanged = oldArr.filter(x => newArr.includes(x));
+      
+      let diffHtml = '';
+      removed.forEach(r => {
+        diffHtml += `<span class="diff-val-box diff-deleted">#${r}</span> `;
+      });
+      added.forEach(a => {
+        diffHtml += `<span class="diff-val-box diff-added">#${a}</span> `;
+      });
+      unchanged.forEach(u => {
+        diffHtml += `<span class="diff-val-box diff-unchanged">#${u}</span> `;
+      });
+      
+      html += `
+        <div class="timeline-diff-row">
+          <span class="timeline-diff-field">${c.field.replace(/_/g, ' ')}</span>
+          <span class="timeline-diff-vals">${diffHtml || 'None'}</span>
         </div>
       `;
     } else {
