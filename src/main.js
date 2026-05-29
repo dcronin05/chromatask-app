@@ -1832,6 +1832,40 @@ async function openTimeTravelModal(taskId, historyId) {
   }
 }
 
+let isPolling = false;
+function startPolling() {
+  setInterval(async () => {
+    if (document.hidden || isPolling) return;
+    isPolling = true;
+    const oldTasksStr = JSON.stringify(tasks);
+    try {
+      await fetchTasks();
+      if (JSON.stringify(tasks) !== oldTasksStr) {
+        renderView();
+        if (activeTaskId) {
+          const drawer = document.getElementById('detail-drawer');
+          if (drawer && drawer.classList.contains('open')) {
+            const hasFocus = drawer.contains(document.activeElement);
+            if (!hasFocus) {
+              const updatedTask = tasks.find(t => t.task_id === activeTaskId);
+              if (updatedTask) {
+                renderDrawerFields(updatedTask);
+                renderDetailHistoryTimeline(activeTaskId);
+              } else {
+                closeDetailDrawer();
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Polling error:", e);
+    } finally {
+      isPolling = false;
+    }
+  }, 3000);
+}
+
 // ==========================================
 // 8. EVENT BINDINGS
 // ==========================================
@@ -1839,6 +1873,7 @@ async function openTimeTravelModal(taskId, historyId) {
 document.addEventListener('DOMContentLoaded', async () => {
   await fetchTasks();
   renderView();
+  startPolling();
 
   // --- View toggles ---
   document.getElementById('nav-all').addEventListener('click', (e) => {
