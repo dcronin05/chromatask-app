@@ -64,41 +64,114 @@ class JSONTestResult(unittest.TestResult):
 class TestRunnerService:
     """
     Service that programmatically discovers, loads, and executes unit tests.
-    Stores the results of the last test execution.
+    Stores the results of the last test execution, preserving historical runs.
     """
     def __init__(self) -> None:
         self.last_results: Optional[Dict[str, Any]] = None
+        self.all_tests_cache: Dict[str, Dict[str, Any]] = {}
+
+    def _discover_all_tests(self) -> List[unittest.TestCase]:
+        """
+        Discovers all test cases from the tests module and returns them as a flat list.
+        """
+        import tests
+        loader = unittest.TestLoader()
+        suite = loader.loadTestsFromModule(tests)
+
+        def flatten(suite_or_test: Any) -> List[unittest.TestCase]:
+            test_cases = []
+            if isinstance(suite_or_test, unittest.TestCase):
+                test_cases.append(suite_or_test)
+            else:
+                for test in suite_or_test:
+                    test_cases.extend(flatten(test))
+            return test_cases
+
+        return flatten(suite)
+
+    def _refresh_test_cache(self) -> None:
+        """
+        Refreshes the internal test cache with newly discovered tests.
+        Keeps previous execution results, appends new tests as PENDING,
+        and removes test cases that no longer exist in tests.py.
+        """
+        try:
+            test_cases = self._discover_all_tests()
+        except Exception:
+            return
+
+        current_keys = set()
+        for t in test_cases:
+            class_name = t.__class__.__name__
+            method_name = t._testMethodName
+            key = f"{class_name}.{method_name}"
+            current_keys.add(key)
+            if key not in self.all_tests_cache:
+                self.all_tests_cache[key] = {
+                    "name": method_name,
+                    "class": class_name,
+                    "status": "PENDING",
+                    "duration": 0.0,
+                    "message": "Not run yet."
+                }
+
+        # Remove deleted tests from cache
+        for key in list(self.all_tests_cache.keys()):
+            if key not in current_keys:
+                del self.all_tests_cache[key]
 
     def run_tests(self, scope: Optional[str] = None) -> Dict[str, Any]:
         """
         Runs the unit tests under tests.py matching the given scope.
-        If scope is None, runs all tests.
-        Scope can be a class name (e.g. 'TaskModelTests') or a specific test (e.g. 'TaskModelTests.test_task_serialization').
+        Updates the cache with new results and returns the merged state of all tests.
+        Scope can be a class name (e.g. 'TaskModelTests') or a specific test method.
         """
-        loader = unittest.TestLoader()
-        
-        # Determine target test suite to load
-        if scope:
-            try:
-                # Load a specific class or method from tests.py
-                suite = loader.loadTestsFromName(f"tests.{scope}")
-            except Exception as e:
-                # Fallback to empty suite on error
-                suite = unittest.TestSuite()
-        else:
-            import tests
-            suite = loader.loadTestsFromModule(tests)
+        # Ensure our cache structure is up to date
+        self._refresh_test_cache()
+
+        try:
+            test_cases = self._discover_all_tests()
+        except Exception as e:
+            # Discovery error (e.g. syntax error in tests.py)
+            return {
+                "scope": scope or "ALL",
+                "timestamp": time.time(),
+                "duration": 0.0,
+                "stats": {"total": 0, "passed": 0, "failed": 0, "success_rate": 0},
+                "results": [{"name": "Error", "class": "Discovery", "status": "ERROR", "duration": 0.0, "message": str(e)}]
+            }
+
+        # Build custom suite with only matching tests
+        suite = unittest.TestSuite()
+        for t in test_cases:
+            class_name = t.__class__.__name__
+            method_name = t._testMethodName
+            full_name = f"{class_name}.{method_name}"
+            
+            # If no scope, run everything. If scope matches class or full name, run it.
+            if not scope or class_name == scope or full_name == scope:
+                suite.addTest(t)
 
         result_collector = JSONTestResult()
-        
         start_time = time.time()
         suite.run(result_collector)
         total_duration = time.time() - start_time
 
-        # Calculate statistics
-        total = len(result_collector.results)
-        passed = sum(1 for r in result_collector.results if r["status"] == "PASS")
-        failed = total - passed
+        # Update cache with new results
+        for res in result_collector.results:
+            key = f"{res['class']}.{res['name']}"
+            if key in self.all_tests_cache:
+                self.all_tests_cache[key].update({
+                    "status": res["status"],
+                    "duration": res["duration"],
+                    "message": res["message"]
+                })
+
+        # Recalculate stats based on the latest cache state
+        results_list = list(self.all_tests_cache.values())
+        total = len(results_list)
+        passed = sum(1 for r in results_list if r["status"] == "PASS")
+        failed = sum(1 for r in results_list if r["status"] in ("FAIL", "ERROR"))
         success_rate = round((passed / total) * 100) if total > 0 else 100
 
         # Construct final report
@@ -112,7 +185,7 @@ class TestRunnerService:
                 "failed": failed,
                 "success_rate": success_rate
             },
-            "results": result_collector.results
+            "results": results_list
         }
 
         # Cache last run results
@@ -121,6 +194,22 @@ class TestRunnerService:
 
     def get_last_results(self) -> Optional[Dict[str, Any]]:
         """
-        Retrieves the report compiled during the last test execution.
+        Retrieves the report compiled during the last test execution,
+        updated with any structural changes.
         """
+        if self.last_results:
+            self._refresh_test_cache()
+            results_list = list(self.all_tests_cache.values())
+            total = len(results_list)
+            passed = sum(1 for r in results_list if r["status"] == "PASS")
+            failed = sum(1 for r in results_list if r["status"] in ("FAIL", "ERROR"))
+            success_rate = round((passed / total) * 100) if total > 0 else 100
+
+            self.last_results["stats"] = {
+                "total": total,
+                "passed": passed,
+                "failed": failed,
+                "success_rate": success_rate
+            }
+            self.last_results["results"] = results_list
         return self.last_results

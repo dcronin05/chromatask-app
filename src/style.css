@@ -2160,6 +2160,12 @@ body {
   box-shadow: 0 0 8px rgba(244, 63, 94, 0.08);
 }
 
+.test-status-badge.status-pending {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-muted);
+  border: 1px solid var(--border-light);
+}
+
 .btn-run-single-test {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-light);

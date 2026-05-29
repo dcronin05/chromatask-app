@@ -1118,16 +1118,31 @@ function renderTestResults(data) {
       component = 'Repositories';
     } else if (test.class.includes('Service')) {
       component = 'Services';
+    } else if (test.class.includes('API') || test.class.includes('Flask')) {
+      component = 'APIs';
     }
 
-    const badgeClass = test.status === 'PASS' ? 'status-pass' : 'status-fail';
+    let badgeClass = 'status-pending';
+    if (test.status === 'PASS') {
+      badgeClass = 'status-pass';
+    } else if (test.status === 'FAIL') {
+      badgeClass = 'status-fail';
+    } else if (test.status === 'ERROR') {
+      badgeClass = 'status-error';
+    }
     
     let errorLogHTML = '';
-    if (test.status !== 'PASS') {
+    if (test.status === 'FAIL' || test.status === 'ERROR') {
       errorLogHTML = `
         <div class="test-details-container" style="margin-top: 8px;">
           <button class="btn-toggle-traceback" data-trace-id="trace-${idx}">Show Traceback Details</button>
           <pre class="test-traceback-pane" id="trace-${idx}">${escapeHtml(test.message)}</pre>
+        </div>
+      `;
+    } else if (test.status === 'PENDING') {
+      errorLogHTML = `
+        <div style="margin-top: 4px;">
+          <span style="font-size: 11px; color: var(--color-text-muted); font-style: italic;">Not run yet</span>
         </div>
       `;
     }
