@@ -229,7 +229,7 @@ function renderView() {
   } else if (currentView === 'DOCS') {
     document.getElementById('board-container').style.display = 'none';
     document.getElementById('archive-container').style.display = 'none';
-    document.getElementById('docs-container').style.display = 'block';
+    document.getElementById('docs-container').style.display = 'flex';
     document.getElementById('sidebar-filters-section').style.display = 'none';
     document.getElementById('header-search-box').style.display = 'none';
     document.getElementById('btn-add-task').style.display = 'none';
@@ -1694,5 +1694,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderDetailHistoryTimeline(activeTaskId);
       closeModal('bookmark-modal');
     });
+  });
+
+  // --- Click outside modal overlay to close it ---
+  document.querySelectorAll('.modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        closeModal(overlay.id);
+      }
+    });
+  });
+
+  // --- Escape key press to close active modals ---
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(overlay => {
+        closeModal(overlay.id);
+      });
+    }
   });
 });

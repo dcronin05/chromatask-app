@@ -165,7 +165,7 @@ def get_docs_health():
 
 @app.route("/api/docs/guides", methods=["GET"])
 def get_guides_list():
-    guides = ["architecture", "database"]
+    guides = ["architecture", "database", "time_travel"]
     return jsonify(guides), 200
 
 
