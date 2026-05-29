@@ -106,11 +106,11 @@ class TaskService:
             return task.to_dict()
 
     def get_task_history(self, task_id):
-        """Retrieves audit log events for a task (oldest first)."""
+        """Retrieves audit log events for a task (newest first)."""
         with DatabaseContext(self.db_file_path) as db:
             logs = db.history.get_all(task_id=task_id)
-            # Sort chronologically (oldest first)
-            logs.sort(key=lambda l: l.timestamp)
+            # Sort chronologically (newest first)
+            logs.sort(key=lambda l: l.timestamp, reverse=True)
             return [l.to_dict() for l in logs]
 
     def _reconstruct_task_dict_at(self, task_id, history_id, db):
