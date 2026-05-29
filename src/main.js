@@ -2174,6 +2174,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('time-travel-close-btn').addEventListener('click', () => closeModal('time-travel-modal'));
   document.getElementById('time-travel-cancel-btn').addEventListener('click', () => closeModal('time-travel-modal'));
 
+  // Task Modal controls
+  document.getElementById('btn-add-task').addEventListener('click', () => {
+    document.getElementById('task-form').reset();
+    openModal('task-modal');
+  });
+  document.getElementById('modal-close').addEventListener('click', () => closeModal('task-modal'));
+  document.getElementById('form-cancel').addEventListener('click', () => closeModal('task-modal'));
+
   // Drawer Main delete/restore button
   document.getElementById('btn-delete-task').addEventListener('click', () => {
     if (!activeTaskId) return;
