@@ -173,11 +173,19 @@
 
         <!-- Developer Docs & Code Health Console (Hidden by default) -->
         <div class="docs-container" id="docs-container" style="display: none;">
-          <div class="docs-subnav">
-            <button class="docs-subnav-btn active" data-subtab="explorer" id="subnav-explorer">Class Explorer</button>
-            <button class="docs-subnav-btn" data-subtab="api" id="subnav-api">API Reference</button>
-            <button class="docs-subnav-btn" data-subtab="health" id="subnav-health">Code Health</button>
-            <button class="docs-subnav-btn" data-subtab="guides" id="subnav-guides">Architecture Guides</button>
+          <div class="docs-header-bar">
+            <div class="docs-subnav">
+              <button class="docs-subnav-btn active" data-subtab="explorer" id="subnav-explorer">Class Explorer</button>
+              <button class="docs-subnav-btn" data-subtab="api" id="subnav-api">API Reference</button>
+              <button class="docs-subnav-btn" data-subtab="health" id="subnav-health">Code Health</button>
+              <button class="docs-subnav-btn" data-subtab="guides" id="subnav-guides">Architecture Guides</button>
+            </div>
+            <div class="version-selector-container">
+              <label for="docs-version-select">Code Version:</label>
+              <select id="docs-version-select" class="docs-version-select">
+                <option value="">Live Code (Local Disk)</option>
+              </select>
+            </div>
           </div>
 
           <div class="docs-tab-content-wrapper">
