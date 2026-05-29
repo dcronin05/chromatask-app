@@ -81,3 +81,29 @@ To support ad-hoc metadata fields dynamically added to the database (or custom c
 - dynamically injects a configuration entry into `TASK_DISPLAY_CONFIG` to build corresponding input fields and timeline descriptors.
 - **Object Filtering**: Auto-registered fields skip nested object shapes (like `media_metadata`) by running pre-scan checks on all tasks to prevent formatting conflicts and invalid `[object Object]` rendering outputs.
 - **Auto-Pruning**: Dynamically removes configuration entries from the active list if their database values are cleared or re-categorized as system-ignored keys.
+
+---
+
+## 4. Glassmorphic Sidebar Design & UI State Persistence
+
+ChromaTask features a premium floating sidebar with dynamic navigation counters, hover tooltips, and robust state persistence.
+
+### A. Sidebar Layout and Interactions (`index.html` & `src/style.css`)
+- **Glassmorphic Theme**: Styled using `.app-sidebar` as a floating glassmorphic panel with borders and soft box-shadows.
+- **Collapsible Toggle**: Managed via `#btn-toggle-sidebar`. When collapsed, the sidebar transitions from `280px` to `84px` wide. Labels, counters, and tags are hidden with transition opacity, while `#btn-reset-db` shrinks to an icon.
+- **Frosted Tooltips**: Built using pure CSS `::after` tooltips on `.collapsed .nav-item` to display labels and counts on hover.
+
+### B. Dynamic Navigation Counters (`src/main.js`)
+- **Real-Time Calculation**: The `updateSidebarCounters(tasksList)` function calculates active task counts, archived counts, and specific priority counts (`high`, `medium`, `low`) directly from the client's current tasks list.
+- **Sidebar Integration**: Counters are rendered in real-time in `.nav-counter` element pills within each navigation item.
+- **Docs Health Badge**: Calculates the latest codebase quality health score dynamically and binds it to the `#counter-docs` element using the `.docs-badge` styling.
+
+### C. UI State Persistence (`src/main.js`)
+To prevent page reloads or server restarts from resetting the user's active context, key variables are serialized to and from `localStorage`:
+- `currentView`: The active layout tab (e.g. Dashboard, Archive, Dev Docs).
+- `activeFilters`: Selected priorities, search query text, or active tags.
+- `currentDocsSubtab`: The active developer documentation sub-tab.
+- `activeTaskId`: Automatically tracks the open task detail drawer to reopen it on reload.
+- `chromatask_sidebar_collapsed`: Remembers whether the user preferred the collapsed or expanded sidebar state.
+- **State Clearing**: All stored settings are wiped from `localStorage` whenever `apiResetDatabase` resets the task database.
+

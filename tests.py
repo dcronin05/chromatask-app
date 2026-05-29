@@ -528,12 +528,42 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertEqual(list_resp.status_code, 200)
         guides = list_resp.get_json()
         self.assertIn("architecture", guides)
+        self.assertIn("database", guides)
+        self.assertIn("time_travel", guides)
+        self.assertIn("testing", guides)
 
         # Test specific guide retrieval (e.g. database guide)
         guide_resp = self.client.get("/api/docs/guides/database")
         self.assertEqual(guide_resp.status_code, 200)
         self.assertEqual(guide_resp.get_json()["name"], "database")
         self.assertIn("content", guide_resp.get_json())
+
+        # Test architecture guide contains Display Config & Dynamic Schema Engine documentation
+        arch_resp = self.client.get("/api/docs/guides/architecture")
+        self.assertEqual(arch_resp.status_code, 200)
+        arch_content = arch_resp.get_json()["content"]
+        self.assertIn("TASK_DISPLAY_CONFIG", arch_content)
+        self.assertIn("syncDynamicFields", arch_content)
+        self.assertIn("Glassmorphic Sidebar", arch_content)
+        self.assertIn("localStorage", arch_content)
+        self.assertIn("btn-toggle-sidebar", arch_content)
+        self.assertIn("nav-counter", arch_content)
+
+        # Test testing guide contains JSDoc comment/function length thresholds and CSS/HTML audits
+        test_resp = self.client.get("/api/docs/guides/testing")
+        self.assertEqual(test_resp.status_code, 200)
+        test_content = test_resp.get_json()["content"]
+        self.assertIn("JSCodeAnalyzer", test_content)
+        self.assertIn("150 lines", test_content)
+        self.assertIn("60 lines", test_content)
+        self.assertIn("CSSCodeAnalyzer", test_content)
+
+        # Test time travel guide contains list diff and null value timeline logs formatting checks
+        tt_resp = self.client.get("/api/docs/guides/time_travel")
+        self.assertEqual(tt_resp.status_code, 200)
+        tt_content = tt_resp.get_json()["content"]
+        self.assertIn("collaborators", tt_content)
+        self.assertIn("Null Value Formatting", tt_content)
 
     def test_test_suite_and_metrics_endpoints(self) -> None:
         """Verifies test suite runs and individual metrics endpoints are accessible."""
