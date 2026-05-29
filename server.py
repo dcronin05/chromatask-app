@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from services import TaskService
 from doc_service import DocService, PythonCodeAnalyzer
+from test_service import TestRunnerService
 
 app: Flask = Flask(__name__)
 # Enable CORS for cross-origin local testing if needed
@@ -14,6 +15,7 @@ DB_FILE: str = "db.json"
 SEED_FILE: str = "gemini-code-1780008469746.json"
 
 task_service: TaskService = TaskService(DB_FILE)
+test_runner_service: TestRunnerService = TestRunnerService()
 
 # Initialize DocService and register Python AST analyzer
 code_doc_service: DocService = DocService(os.path.dirname(os.path.abspath(__file__)))
@@ -239,6 +241,40 @@ def get_guide(name: str) -> Any:
         if not content:
             return jsonify({"error": "Guide not found"}), 404
         return jsonify({"name": name, "content": content}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/docs/tests", methods=["GET"])
+def get_test_results() -> Any:
+    """
+    Retrieves results of the last unit test suite execution.
+    If no test run exists, performs an initial run of all tests.
+    """
+    try:
+        results = test_runner_service.get_last_results()
+        if not results:
+            results = test_runner_service.run_tests()
+        return jsonify(results), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/docs/tests/run", methods=["POST"])
+def run_test_suite() -> Any:
+    """
+    Runs the unit test suite on-demand.
+    Accepts an optional JSON payload specifying a 'scope' parameter.
+    Example: {"scope": "TaskModelTests"} or {"scope": "TaskModelTests.test_task_serialization"}
+    """
+    try:
+        scope = None
+        if request.is_json:
+            payload = request.json
+            if payload:
+                scope = payload.get("scope")
+        results = test_runner_service.run_tests(scope)
+        return jsonify(results), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
