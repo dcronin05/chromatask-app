@@ -1423,6 +1423,12 @@ body {
 .docs-subnav {
   display: flex;
   gap: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 4px;
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
 }
 
 .version-selector-container {
@@ -1458,36 +1464,33 @@ body {
 
 .docs-subnav-btn {
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: var(--color-text-secondary);
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   padding: 8px 16px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: all var(--transition-fast) cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
 }
 
 .docs-subnav-btn:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--color-text-primary);
+  transform: translateY(-1px);
 }
 
 .docs-subnav-btn.active {
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.2);
   color: #38bdf8;
+  box-shadow: 0 4px 15px rgba(56, 189, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .docs-subnav-btn.active::after {
-  content: '';
-  position: absolute;
-  bottom: -13px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background-color: #38bdf8;
-  border-radius: var(--radius-full);
+  display: none;
 }
 
 /* Subnav Panel views */
@@ -1522,20 +1525,21 @@ body {
 }
 
 .class-card {
-  background: var(--bg-glass-card);
-  border: 1px solid var(--border-light);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-lg);
   padding: 20px;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: all var(--transition-fast) cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  backdrop-filter: blur(20px);
 }
 
 .class-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-glass);
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(192, 132, 252, 0.4);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25), 0 0 20px rgba(192, 132, 252, 0.15);
 }
 
 .class-card-header {
@@ -1722,6 +1726,7 @@ body {
   stroke-dasharray: 314.16; /* Circumference of circle with r=50 */
   stroke-dashoffset: 314.16; /* Hidden initially */
   transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s ease;
+  filter: drop-shadow(0 0 6px currentColor);
 }
 
 .health-score-val {
@@ -1824,6 +1829,38 @@ body {
 .warning-file {
   font-family: monospace;
   color: var(--color-text-muted);
+}
+
+/* Warning Table Row Animations */
+@keyframes fadeInRow {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOutRow {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(4px);
+    background: rgba(244, 63, 94, 0.08);
+  }
+}
+
+.fade-in-row {
+  animation: fadeInRow var(--transition-normal) forwards;
+}
+
+.fade-out-row {
+  animation: fadeOutRow var(--transition-normal) forwards;
 }
 
 /* Guides layout styling */
@@ -2258,4 +2295,38 @@ body {
   max-height: 250px;
   display: none;
   animation: fadeIn var(--transition-fast) ease-out;
+}
+
+/* Helper Utility Classes to avoid inline styles */
+.loading-spinner {
+  border-left-color: #ffffff;
+}
+
+#tests-gauge-fill {
+  stroke: var(--color-status-completed);
+}
+
+.text-success {
+  color: var(--color-status-completed);
+}
+
+.text-danger {
+  color: var(--color-priority-high);
+}
+
+#time-travel-subtitle {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.modal-footer-between {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-note {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-style: italic;
 }

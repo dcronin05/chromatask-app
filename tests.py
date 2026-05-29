@@ -291,3 +291,298 @@ class CodebaseQualityTests(unittest.TestCase):
         self.assertIn("warnings", report)
         self.assertIsInstance(report.get("score"), int)
 
+
+class AnalyzerStrategyTests(unittest.TestCase):
+    """
+    Unit tests for the AST/regex-based language analyzers (JS, CSS, HTML).
+    """
+    def setUp(self) -> None:
+        """Creates temporary files for in-memory analyzer parsing audits."""
+        self.js_path: str = "temp_test_js.js"
+        self.css_path: str = "temp_test_css.css"
+        self.html_path: str = "temp_test_html.html"
+
+    def tearDown(self) -> None:
+        """Removes the temporary test files from the workspace."""
+        for path in (self.js_path, self.css_path, self.html_path):
+            if os.path.exists(path):
+                os.remove(path)
+
+    def test_js_analyzer_violations(self) -> None:
+        """Verifies JSCodeAnalyzer detects naming, JSDoc, console.log, and eval warnings."""
+        js_code: str = (
+            "// Simple comment\n"
+            "console.log('debug');\n"
+            "eval('1+1');\n"
+            "\n\n\n\n\n"
+            "function bad_naming_style() {\n"
+            "  const x = 1;\n"
+            "  const y = 2;\n"
+            "  const z = 3;\n"
+            + "\n".join("  console.log(x + y + z);" for _ in range(60)) + "\n"
+            "  return 42;\n"
+            "}\n"
+        )
+        with open(self.js_path, "w", encoding="utf-8") as f:
+            f.write(js_code)
+
+        from doc_service import JSCodeAnalyzer
+        analyzer: JSCodeAnalyzer = JSCodeAnalyzer(self.js_path)
+        report: Dict[str, Any] = analyzer.analyze()
+        warnings: List[Dict[str, Any]] = report["health"]["warnings"]
+        issues: List[str] = [w["issue"] for w in warnings]
+
+        self.assertIn("Console log left in code.", issues)
+        self.assertIn("Avoid using eval() for security reasons.", issues)
+        self.assertTrue(any("naming convention" in iss for iss in issues))
+        self.assertTrue(any("missing descriptive comments" in iss for iss in issues))
+        self.assertLess(report["health"]["score"], 100)
+
+    def test_css_analyzer_violations(self) -> None:
+        """Verifies CSSCodeAnalyzer detects hardcoded colors and !important rules."""
+        css_code: str = (
+            "/* CSS comment */\n"
+            ".btn-primary {\n"
+            "  background-color: #ff00ff !important;\n"
+            "  color: white;\n"
+            "}\n"
+        )
+        with open(self.css_path, "w", encoding="utf-8") as f:
+            f.write(css_code)
+
+        from doc_service import CSSCodeAnalyzer
+        analyzer: CSSCodeAnalyzer = CSSCodeAnalyzer(self.css_path)
+        report: Dict[str, Any] = analyzer.analyze()
+        warnings: List[Dict[str, Any]] = report["health"]["warnings"]
+        issues: List[str] = [w["issue"] for w in warnings]
+
+        self.assertTrue(any("!important overrides" in iss for iss in issues))
+        self.assertTrue(any("Hardcoded color value found" in iss for iss in issues))
+        self.assertLess(report["health"]["score"], 100)
+
+    def test_html_analyzer_violations(self) -> None:
+        """Verifies HTMLCodeAnalyzer detects inline styles, missing alt attributes, and duplicate IDs."""
+        html_code: str = (
+            "<!-- HTML comment -->\n"
+            "<div id='dup-id' style='margin: 10px; color: red;'>\n"
+            "  <img src='logo.png' />\n"
+            "  <span id='dup-id'>Hello</span>\n"
+            "</div>\n"
+        )
+        with open(self.html_path, "w", encoding="utf-8") as f:
+            f.write(html_code)
+
+        from doc_service import HTMLCodeAnalyzer
+        analyzer: HTMLCodeAnalyzer = HTMLCodeAnalyzer(self.html_path)
+        report: Dict[str, Any] = analyzer.analyze()
+        warnings: List[Dict[str, Any]] = report["health"]["warnings"]
+        issues: List[str] = [w["issue"] for w in warnings]
+
+        self.assertTrue(any("inline styles" in iss for iss in issues))
+        self.assertTrue(any("missing an alt accessibility" in iss for iss in issues))
+        self.assertTrue(any("Duplicate element ID" in iss for iss in issues))
+        self.assertLess(report["health"]["score"], 100)
+
+
+class DocServiceTests(unittest.TestCase):
+    """
+    Unit tests for the DocService orchestration and metrics aggregation.
+    """
+    def test_doc_service_registration_and_analysis(self) -> None:
+        """Verifies custom analyzer registration and project analysis metrics."""
+        from doc_service import DocService, BaseCodeAnalyzer
+
+        class DummyAnalyzer(BaseCodeAnalyzer):
+            def analyze(self) -> Dict[str, Any]:
+                return {
+                    "metadata": {
+                        "file_name": os.path.basename(self.file_path),
+                        "classes": [],
+                        "stats": {"lines": 10, "comments": 2}
+                    },
+                    "health": {"score": 95, "warnings": [{"line": 1, "severity": "WARNING", "scope": "Dummy", "issue": "Dummy warning"}]}
+                }
+
+        service = DocService()
+        service.register_analyzer(".dummy", DummyAnalyzer)
+
+        # Create a temp file to scan
+        temp_path = "temp_dummy.dummy"
+        with open(temp_path, "w") as f:
+            f.write("dummy content")
+
+        try:
+            report = service.analyze_project([temp_path])
+            self.assertEqual(report["files_scanned"], 1)
+            self.assertEqual(report["score"], 95)
+            self.assertEqual(report["stats"]["lines"], 10)
+            self.assertEqual(report["stats"]["comments"], 2)
+            self.assertEqual(len(report["warnings"]), 1)
+            self.assertEqual(report["warnings"][0]["issue"], "Dummy warning")
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+
+class TestRunnerServiceTests(unittest.TestCase):
+    """
+    Unit tests for the TestRunnerService suite execution and cache state.
+    """
+    def test_test_runner_cache_and_scope(self) -> None:
+        """Verifies TestRunnerService test discovery, caching, and scoped execution."""
+        from test_service import TestRunnerService
+        runner = TestRunnerService()
+
+        # Run tests matching only TaskModelTests
+        report = runner.run_tests(scope="TaskModelTests")
+        self.assertEqual(report["scope"], "TaskModelTests")
+        self.assertGreater(report["stats"]["total"], 0)
+
+        # Check that only TaskModelTests items are run (others remain PENDING or not updated)
+        # and matching items are not PENDING anymore
+        results = report["results"]
+        task_model_results = [r for r in results if r["class"] == "TaskModelTests"]
+        self.assertTrue(all(r["status"] != "PENDING" for r in task_model_results))
+
+
+class FlaskAPIAdditionalTests(FlaskAPITests):
+    """
+    Comprehensive integration tests for all additional Flask API endpoints.
+    """
+    def test_get_task_by_id_endpoint(self) -> None:
+        """Verifies GET /api/tasks/<task_id> returns 200 for existing and 404 for missing."""
+        # Test 404 for missing task
+        response_404 = self.client.get("/api/tasks/non-existent-id")
+        self.assertEqual(response_404.status_code, 404)
+
+        # Create a task
+        create_resp = self.client.post("/api/tasks", json={"title": "Single Task"})
+        task_id = create_resp.get_json()["task_id"]
+
+        # Test 200 for existing task
+        response_200 = self.client.get(f"/api/tasks/{task_id}")
+        self.assertEqual(response_200.status_code, 200)
+        self.assertEqual(response_200.get_json()["title"], "Single Task")
+
+    def test_delete_and_restore_endpoints(self) -> None:
+        """Verifies DELETE /api/tasks/<task_id> and restore endpoints work correctly."""
+        # Create a task
+        create_resp = self.client.post("/api/tasks", json={"title": "Delete Restore Task"})
+        task_id = create_resp.get_json()["task_id"]
+
+        # Soft-delete the task
+        del_resp = self.client.delete(f"/api/tasks/{task_id}")
+        self.assertEqual(del_resp.status_code, 200)
+        self.assertTrue(del_resp.get_json()["is_deleted"])
+
+        # Restore the task
+        restore_resp = self.client.post(f"/api/tasks/{task_id}/restore")
+        self.assertEqual(restore_resp.status_code, 200)
+        self.assertFalse(restore_resp.get_json()["is_deleted"])
+
+    def test_task_history_endpoint(self) -> None:
+        """Verifies GET /api/tasks/<task_id>/history returns audit log entries."""
+        # Create a task
+        create_resp = self.client.post("/api/tasks", json={"title": "History Task"})
+        task_id = create_resp.get_json()["task_id"]
+
+        # Get history logs
+        hist_resp = self.client.get(f"/api/tasks/{task_id}/history")
+        self.assertEqual(hist_resp.status_code, 200)
+        data = hist_resp.get_json()
+        self.assertGreater(len(data), 0)
+        self.assertEqual(data[0]["action"], "CREATED")
+
+    def test_reset_database_endpoint(self) -> None:
+        """Verifies POST /api/reset clears all tasks from the service database."""
+        # Create a task first
+        self.client.post("/api/tasks", json={"title": "To Be Reset"})
+
+        # Reset database
+        reset_resp = self.client.post("/api/reset")
+        self.assertEqual(reset_resp.status_code, 200)
+
+        # Confirm tasks list is empty
+        list_resp = self.client.get("/api/tasks")
+        self.assertEqual(len(list_resp.get_json()), 0)
+
+    def test_get_docs_commits_endpoint(self) -> None:
+        """Verifies GET /api/docs/commits returns recent git commits metadata."""
+        response = self.client.get("/api/docs/commits")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIsInstance(data, list)
+
+    def test_get_docs_metadata_endpoint(self) -> None:
+        """Verifies GET /api/docs/metadata returns workspace static metadata analysis."""
+        response = self.client.get("/api/docs/metadata")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn("files", data)
+        self.assertIsInstance(data["files"], list)
+
+    def test_get_docs_guides_endpoints(self) -> None:
+        """Verifies GET /api/docs/guides lists guides and retrieves markdown content."""
+        # Test guides list
+        list_resp = self.client.get("/api/docs/guides")
+        self.assertEqual(list_resp.status_code, 200)
+        guides = list_resp.get_json()
+        self.assertIn("architecture", guides)
+
+        # Test specific guide retrieval (e.g. database guide)
+        guide_resp = self.client.get("/api/docs/guides/database")
+        self.assertEqual(guide_resp.status_code, 200)
+        self.assertEqual(guide_resp.get_json()["name"], "database")
+        self.assertIn("content", guide_resp.get_json())
+
+    def test_test_suite_and_metrics_endpoints(self) -> None:
+        """Verifies test suite runs and individual metrics endpoints are accessible."""
+        # Trigger test suite run via POST
+        run_resp = self.client.post("/api/docs/tests/run", json={"scope": "TaskModelTests"})
+        self.assertEqual(run_resp.status_code, 200)
+        self.assertEqual(run_resp.get_json()["scope"], "TaskModelTests")
+
+        # Get last test results via GET
+        get_resp = self.client.get("/api/docs/tests")
+        self.assertEqual(get_resp.status_code, 200)
+        self.assertEqual(get_resp.get_json()["scope"], "TaskModelTests")
+
+        # Poll total metric endpoint
+        total_resp = self.client.get("/api/docs/tests/metrics/total")
+        self.assertEqual(total_resp.status_code, 200)
+        self.assertIn("total", total_resp.get_json())
+        self.assertIsInstance(total_resp.get_json()["total"], int)
+
+        # Poll passed metric endpoint
+        passed_resp = self.client.get("/api/docs/tests/metrics/passed")
+        self.assertEqual(passed_resp.status_code, 200)
+        self.assertIn("passed", passed_resp.get_json())
+
+        # Poll invalid metric endpoint
+        invalid_resp = self.client.get("/api/docs/tests/metrics/invalid-name")
+        self.assertEqual(invalid_resp.status_code, 400)
+
+    def test_reconstruction_and_rollback_endpoints(self) -> None:
+        """Verifies task state reconstructed playback and rollback REST endpoints."""
+        # Create a task
+        create_resp = self.client.post("/api/tasks", json={"title": "Original"})
+        task = create_resp.get_json()
+        task_id = task["task_id"]
+
+        # Get task history to retrieve creation event ID
+        hist_resp = self.client.get(f"/api/tasks/{task_id}/history")
+        history_id = hist_resp.get_json()[0]["history_id"]
+
+        # Update the task title
+        self.client.put(f"/api/tasks/{task_id}", json={"title": "Updated"})
+
+        # Get reconstructed state at creation event
+        recon_resp = self.client.get(f"/api/tasks/{task_id}/history/{history_id}")
+        self.assertEqual(recon_resp.status_code, 200)
+        self.assertEqual(recon_resp.get_json()["reconstructed"]["title"], "Original")
+
+        # Perform rollback to creation event
+        rollback_resp = self.client.post(f"/api/tasks/{task_id}/rollback/{history_id}")
+        self.assertEqual(rollback_resp.status_code, 200)
+        self.assertEqual(rollback_resp.get_json()["title"], "Original")
+

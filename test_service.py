@@ -78,7 +78,13 @@ class TestRunnerService:
         """
         Discovers all test cases from the tests module and returns them as a flat list.
         """
+        import sys
+        import importlib
         import tests
+        try:
+            importlib.reload(tests)
+        except Exception:
+            pass
         loader = unittest.TestLoader()
         suite = loader.loadTestsFromModule(tests)
 

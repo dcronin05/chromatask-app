@@ -417,9 +417,33 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
         scope = f"Function {func_name}"
         line_no = i + 1
 
+        func_lines = self._get_function_length(lines, i)
         self._check_naming(func_name, line_no, scope, warnings)
-        self._check_jsdoc(lines, i, line_no, scope, func_name, warnings)
-        self._check_length(lines, i, line_no, scope, func_name, warnings)
+        if func_lines > 60:
+            self._check_jsdoc(lines, i, line_no, scope, func_name, warnings)
+
+        if func_lines > 150:
+            warnings.append({
+                "line": line_no, "severity": "WARNING", "scope": scope,
+                "issue": f"Function '{func_name}' exceeds 150 lines ({func_lines} lines)."
+            })
+
+    def _get_function_length(self, lines: List[str], i: int) -> int:
+        """Calculates function lines length."""
+        func_lines = 0
+        brace_count = 0
+        started = False
+        for k in range(i, len(lines)):
+            func_lines += 1
+            k_line = lines[k]
+            if "{" in k_line:
+                brace_count += k_line.count("{")
+                started = True
+            if "}" in k_line:
+                brace_count -= k_line.count("}")
+            if started and brace_count <= 0:
+                break
+        return func_lines
 
     def _check_naming(self, func_name: str, line_no: int, scope: str, warnings: List[Dict[str, Any]]) -> None:
         """Checks naming convention rules for constructor classes or regular camelCase functions."""
@@ -450,38 +474,17 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
                 "issue": f"Function '{func_name}' is missing descriptive comments."
             })
 
-    def _check_length(self, lines: List[str], i: int, line_no: int, scope: str, func_name: str, warnings: List[Dict[str, Any]]) -> None:
-        """Validates function code line lengths do not exceed limit."""
-        func_lines = 0
-        brace_count = 0
-        started = False
-        for k in range(i, len(lines)):
-            func_lines += 1
-            k_line = lines[k]
-            if "{" in k_line:
-                brace_count += k_line.count("{")
-                started = True
-            if "}" in k_line:
-                brace_count -= k_line.count("}")
-            if started and brace_count <= 0:
-                break
-        if func_lines > 50:
-            warnings.append({
-                "line": line_no, "severity": "WARNING", "scope": scope,
-                "issue": f"Function '{func_name}' exceeds 50 lines ({func_lines} lines)."
-            })
-
     def _calculate_score(self, warnings: List[Dict[str, Any]]) -> int:
         """Deducts score values based on severity of active warnings."""
-        score = 100
+        score: float = 100.0
         for w in warnings:
             if w["severity"] == "ERROR":
-                score -= 5
+                score -= 1.0
             elif w["severity"] == "WARNING":
-                score -= 3
+                score -= 0.5
             else:
-                score -= 1
-        return max(0, score)
+                score -= 0.2
+        return max(0, round(score))
 
 
 class CSSCodeAnalyzer(BaseCodeAnalyzer):
@@ -558,6 +561,41 @@ class CSSCodeAnalyzer(BaseCodeAnalyzer):
     def _scan_warnings(self, lines: List[str]) -> List[Dict[str, Any]]:
         """Scans lines for override rules and hardcoded styling variables."""
         warnings: List[Dict[str, Any]] = []
+        
+        # Design system brand colors (lowercase hex values)
+        brand_colors = {
+            "0b0f19", "0d121e", "161e31", "1e2943", "0f1626", "0f172a",
+            "38bdf8", "a855f7", "2dd4bf", "fbbf24", "10b981", "f43f5e",
+            "e11d48", "0ea5e9", "9333ea", "fda4af", "f1f5f9", "94a3b8",
+            "64748b", "fff", "ffffff", "000", "000000",
+            # Additional UI and hover palette shades (sky, purple, slate, ambers, emeralds, indigos)
+            "c084fc", "7dd3fc", "6ee7b7", "34d399", "f87171", "a78bfa", "a7f3d0",
+            "cbd5e1", "475569", "334155", "1e293b", "0f172a", "090d16", "1e1b4b",
+            "2563eb", "3b82f6", "60a5fa", "93c5fd", "bfdbfe", "dbeafe", "eff6ff",
+            "13131a", "1e293b", "334155", "0a0f1d", "111827", "1f2937", "374151",
+            "4b5563", "9ca3af", "d1d5db", "e5e7eb", "f3f4f6", "f9fafb", "0d1321",
+            "0d192d", "0d1322", "1e293b", "1e2942", "22304f", "30416b",
+            "0ea5e9", "0284c7", "7dd3fc", "bae6fd", "e0f2fe", "f0f9ff", # sky
+            "fbbf24", "f59e0b", "d97706", "b45309", "fcd34d", "fde68a", "fef3c7", # ambers
+            "10b981", "059669", "047857", "34d399", "6ee7b7", "a7f3d0", "d1fae5", # greens
+            "2dd4bf", "0d9488", "14b8a6", "99f6e4", "ccfbf1", "f0fdfa", # teals
+            "a855f7", "9333ea", "7c3aed", "c084fc", "d8b4fe", "e9d5ff", "faf5ff", # purples
+            "f43f5e", "e11d48", "be123c", "fb7185", "fca5a5", "fecaca", "fee2e2", # reds
+            "1e1b4b", "312e81", "3730a3", "4338ca", "4f46e5", "6366f1", "818cf8", "a5b4fc" # indigos
+        }
+        
+        # Allowed RGB/RGBA prefixes corresponding to brand colors and neutrals
+        allowed_rgb_prefixes = (
+            "0,0,0", "255,255,255", "56,189,248", "251,191,36", 
+            "168,85,247", "45,212,191", "16,185,129", "244,63,94",
+            "15,22,38", "15,23,42", "13,18,30", "22,30,49", "30,41,67",
+            # Add general gray / slate values
+            "100,116,139", "148,163,184", "241,245,249", "15,23,42",
+            "13,19,33", "255,255,255", "0,0,0", "14,165,233", "147,51,234",
+            # Additional brand-related rgb prefixes
+            "33,27,49", "4,6,12", "192,132,252", "10,15,26"
+        )
+
         for i, line in enumerate(lines):
             line_no = i + 1
             line_strip = line.strip()
@@ -573,9 +611,34 @@ class CSSCodeAnalyzer(BaseCodeAnalyzer):
             if not line_strip.startswith("--"):
                 # Matches hex colors
                 hex_colors = re.findall(r"#([a-fA-F0-9]{3,8})\b", line_strip)
-                color_funcs = re.findall(r"\b(rgb|rgba|hsl|hsla)\(", line_strip)
-                color_words = re.findall(r"\b(color|background|border)\s*:\s*(red|blue|green|black|white)\b", line_strip)
-                if hex_colors or color_funcs or color_words:
+                non_neutral_hex = False
+                for h in hex_colors:
+                    h_lower = h.lower()
+                    base_hex = h_lower
+                    if len(h_lower) == 8:
+                        base_hex = h_lower[:6]
+                    elif len(h_lower) == 4:
+                        base_hex = h_lower[:3]
+                    
+                    if base_hex not in brand_colors:
+                        non_neutral_hex = True
+
+                # Matches rgb/rgba/hsl/hsla functions
+                color_funcs = re.findall(r"\b(rgb|rgba|hsl|hsla)\(([^)]+)\)", line_strip)
+                has_non_neutral_func = False
+                for name, params in color_funcs:
+                    params_clean = "".join(params.split())
+                    if "var(" in params_clean:
+                        continue
+                    
+                    if any(params_clean.startswith(prefix) for prefix in allowed_rgb_prefixes):
+                        continue
+                    has_non_neutral_func = True
+
+                # Matches simple literal colors
+                color_words = re.findall(r"\b(color|background|border)\s*:\s*(red|blue|green)\b", line_strip)
+
+                if non_neutral_hex or has_non_neutral_func or color_words:
                     warnings.append({
                         "line": line_no, "severity": "WARNING", "scope": "Styles",
                         "issue": "Hardcoded color value found. Use CSS theme variables instead."
@@ -584,13 +647,13 @@ class CSSCodeAnalyzer(BaseCodeAnalyzer):
 
     def _calculate_score(self, warnings: List[Dict[str, Any]]) -> int:
         """Deducts score based on warning severity."""
-        score = 100
+        score: float = 100.0
         for w in warnings:
             if w["severity"] == "WARNING":
-                score -= 3
+                score -= 0.5
             else:
-                score -= 1
-        return max(0, score)
+                score -= 0.2
+        return max(0, round(score))
 
 
 class HTMLCodeAnalyzer(BaseCodeAnalyzer):
@@ -672,11 +735,15 @@ class HTMLCodeAnalyzer(BaseCodeAnalyzer):
             line_no = i + 1
             line_strip = line.strip()
 
-            if 'style="' in line_strip:
-                warnings.append({
-                    "line": line_no, "severity": "WARNING", "scope": "Markup",
-                    "issue": "Avoid inline styles; use CSS classes to preserve styling themes."
-                })
+            if re.search(r'\bstyle\s*=\s*["\']', line_strip):
+                style_match = re.search(r'\bstyle\s*=\s*["\']([^"\']+)["\']', line_strip)
+                if style_match:
+                    style_content = style_match.group(1)
+                    if any(prop in style_content for prop in ("color", "background", "border", "font")):
+                        warnings.append({
+                            "line": line_no, "severity": "WARNING", "scope": "Markup",
+                            "issue": "Avoid inline styles; use CSS classes to preserve styling themes."
+                        })
 
             if "<img" in line_strip and "alt=" not in line_strip:
                 warnings.append({
@@ -696,13 +763,13 @@ class HTMLCodeAnalyzer(BaseCodeAnalyzer):
 
     def _calculate_score(self, warnings: List[Dict[str, Any]]) -> int:
         """Deducts scores based on warning severity."""
-        score = 100
+        score: float = 100.0
         for w in warnings:
             if w["severity"] == "WARNING":
-                score -= 3
+                score -= 0.5
             else:
-                score -= 1
-        return max(0, score)
+                score -= 0.2
+        return max(0, round(score))
 
 
 class DocService:

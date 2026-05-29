@@ -231,7 +231,7 @@ def get_guides_list() -> Any:
     """
     Retrieves a list of available system documentation markdown guides.
     """
-    guides: List[str] = ["architecture", "database", "time_travel"]
+    guides: List[str] = ["architecture", "database", "time_travel", "testing"]
     return jsonify(guides), 200
 
 
@@ -285,6 +285,36 @@ def run_test_suite() -> Any:
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/docs/tests/metrics/<metric_name>", methods=["GET"])
+def get_test_metric(metric_name: str) -> Any:
+    """
+    Retrieves a single test metric from the last test run.
+    Valid metric names: total, passed, failed, success_rate, duration, timestamp.
+    """
+    try:
+        results = test_runner_service.get_last_results()
+        if not results:
+            results = test_runner_service.run_tests()
+
+        stats = results.get("stats", {})
+        metric_map = {
+            "total": stats.get("total"),
+            "passed": stats.get("passed"),
+            "failed": stats.get("failed"),
+            "success-rate": stats.get("success_rate"),
+            "success_rate": stats.get("success_rate"),
+            "duration": results.get("duration"),
+            "timestamp": results.get("timestamp")
+        }
+
+        if metric_name not in metric_map:
+            return jsonify({"error": f"Invalid metric name: {metric_name}"}), 400
+
+        return jsonify({metric_name: metric_map[metric_name]}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/tasks/<task_id>/history/<history_id>", methods=["GET"])
 def get_task_reconstructed_state(task_id: str, history_id: str) -> Any:
     """
@@ -311,6 +341,15 @@ def rollback_task_to_state(task_id: str, history_id: str) -> Any:
         return jsonify({"error": str(ve)}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.after_request
+def add_header(response: Any) -> Any:
+    """Disable caching for all API responses."""
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 if __name__ == "__main__":

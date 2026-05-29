@@ -9,6 +9,10 @@ let activeTaskId = null;
 let currentView = 'DASHBOARD'; // 'DASHBOARD', 'ARCHIVE', or 'DOCS'
 let currentDocsSubtab = 'explorer'; // 'explorer', 'api', 'health', or 'guides'
 let currentDocsCommit = ''; // Selected commit hash for versioning (empty string means Live Code)
+let oldHealthStr = '';
+let oldTestsStr = '';
+let oldMetadataStr = '';
+let oldGuideStr = '';
 let activeFilters = {
   search: '',
   priority: 'ALL',
@@ -488,7 +492,6 @@ let ytPlayer = null;
 let ytPlayerReady = false;
 
 window.onYouTubeIframeAPIReady = () => {
-  console.log("YouTube Player API is loaded.");
   if (activeTaskId) {
     const task = tasks.find(t => t.task_id === activeTaskId);
     if (task && task.media_metadata && task.media_metadata.video_id) {
@@ -593,7 +596,7 @@ function renderView() {
     document.getElementById('sidebar-filters-section').style.display = 'none';
     document.getElementById('header-search-box').style.display = 'none';
     document.getElementById('btn-add-task').style.display = 'none';
-    document.getElementById('page-title').textContent = 'Developer Console';
+    document.getElementById('page-title').textContent = 'Dev Docs & Health';
     document.getElementById('task-metrics-summary').textContent = 'Programmatic OOP Reflection & Quality';
 
     loadDocsSubtab(currentDocsSubtab);
@@ -672,6 +675,11 @@ function renderSidebarTags(tagSet) {
   });
 }
 
+/**
+ * Creates and returns a task card DOM element.
+ * @param {Object} task - The task data.
+ * @returns {HTMLElement} The card element.
+ */
 function createTaskCard(task) {
   const card = document.createElement('div');
   card.className = `task-card ${task.is_core ? 'protected-core' : ''}`;
@@ -820,6 +828,10 @@ function renderDrawerFields(task) {
   }
 }
 
+/**
+ * Opens the detail drawer for a task.
+ * @param {string} taskId - The ID of the task.
+ */
 async function openDetailDrawer(taskId) {
   let task = tasks.find(t => t.task_id === taskId);
   if (!task) {
@@ -898,6 +910,10 @@ function closeDetailDrawer() {
   }
 }
 
+/**
+ * Renders the task history timeline in the drawer.
+ * @param {string} taskId - The ID of the task.
+ */
 async function renderDetailHistoryTimeline(taskId) {
   const container = document.getElementById('detail-timeline-container');
   if (!container) return;
@@ -1093,53 +1109,60 @@ async function loadClassExplorer() {
     const response = await fetch(url);
     if (!response.ok) throw new Error();
     const data = await response.json();
-
-    container.innerHTML = '';
-    
-    data.files.forEach(file => {
-      file.classes.forEach(cls => {
-        const card = document.createElement('div');
-        card.className = 'class-card';
-
-        const docstringHTML = cls.docstring ? `
-          <div class="class-docstring">"${cls.docstring.trim()}"</div>
-        ` : '';
-
-        const methodsHTML = cls.methods.length > 0 ? `
-          <div class="class-methods-section">
-            <span class="class-methods-title">Methods</span>
-            <div class="methods-list">
-              ${cls.methods.map(m => `
-                <div class="method-item">
-                  <div class="method-item-header">
-                    <span class="method-signature">
-                      def <span class="method-name">${m.name}</span>(<span class="method-args">${m.args.join(', ')}</span>)
-                    </span>
-                    <span class="method-line-badge">Line ${m.line}</span>
-                  </div>
-                  ${m.docstring ? `<p class="method-doc">${m.docstring.trim()}</p>` : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : '<p class="text-muted" style="font-size:11px;">No class methods defined.</p>';
-
-        card.innerHTML = `
-          <div class="class-card-header">
-            <h3>${cls.name}</h3>
-            <span class="class-card-file">${file.file_name}</span>
-          </div>
-          ${docstringHTML}
-          ${methodsHTML}
-        `;
-
-        container.appendChild(card);
-      });
-    });
+    oldMetadataStr = JSON.stringify(data);
+    renderClassExplorerData(data);
   } catch (error) {
     console.error(error);
     container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color: #f43f5e; padding: 24px;">Failed to reflect OOP codebase metadata.</div>';
   }
+}
+
+function renderClassExplorerData(data) {
+  const container = document.getElementById('class-explorer-container');
+  if (!container) return;
+
+  container.innerHTML = '';
+  
+  data.files.forEach(file => {
+    file.classes.forEach(cls => {
+      const card = document.createElement('div');
+      card.className = 'class-card';
+
+      const docstringHTML = cls.docstring ? `
+        <div class="class-docstring">"${cls.docstring.trim()}"</div>
+      ` : '';
+
+      const methodsHTML = cls.methods.length > 0 ? `
+        <div class="class-methods-section">
+          <span class="class-methods-title">Methods</span>
+          <div class="methods-list">
+            ${cls.methods.map(m => `
+              <div class="method-item">
+                <div class="method-item-header">
+                  <span class="method-signature">
+                    def <span class="method-name">${m.name}</span>(<span class="method-args">${m.args.join(', ')}</span>)
+                  </span>
+                  <span class="method-line-badge">Line ${m.line}</span>
+                </div>
+                ${m.docstring ? `<p class="method-doc">${m.docstring.trim()}</p>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      ` : '<p class="text-muted" style="font-size:11px;">No class methods defined.</p>';
+
+      card.innerHTML = `
+        <div class="class-card-header">
+          <h3>${cls.name}</h3>
+          <span class="class-card-file">${file.file_name}</span>
+        </div>
+        ${docstringHTML}
+        ${methodsHTML}
+      `;
+
+      container.appendChild(card);
+    });
+  });
 }
 
 async function loadApiReference() {
@@ -1190,50 +1213,132 @@ async function loadCodeHealth() {
     const response = await fetch(url);
     if (!response.ok) throw new Error();
     const data = await response.json();
+    oldHealthStr = JSON.stringify(data);
+    renderCodeHealthData(data);
+  } catch (error) {
+    console.error(error);
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load codebase health audit report.</td></tr>';
+  }
+}
 
-    // 1. Update summary statistics
-    document.getElementById('health-stat-files').textContent = data.files_scanned || 0;
-    document.getElementById('health-stat-classes').textContent = data.stats.classes || 0;
-    document.getElementById('health-stat-methods').textContent = data.stats.methods || 0;
+/**
+ * Renders the code quality score, stats, and warnings table.
+ * @param {Object} data - The health report data.
+ */
+function renderCodeHealthData(data) {
+  const tbody = document.getElementById('warnings-table-body');
+  if (!tbody) return;
+
+  // 1. Update summary statistics
+  document.getElementById('health-stat-files').textContent = data.files_scanned || 0;
+  document.getElementById('health-stat-classes').textContent = data.stats.classes || 0;
+  document.getElementById('health-stat-methods').textContent = data.stats.methods || 0;
+  
+  const score = data.score || 0;
+  document.getElementById('health-score-text').textContent = `${score}%`;
+
+  // 2. Animate SVG circular ring
+  const fillCircle = document.getElementById('health-gauge-fill');
+  if (fillCircle) {
+    const circumference = 2 * Math.PI * 50; // r=50 -> ~314.16
+    const offset = circumference - (score / 100) * circumference;
+    fillCircle.style.strokeDashoffset = offset;
     
-    const score = data.score || 0;
-    document.getElementById('health-score-text').textContent = `${score}%`;
-
-    // 2. Animate SVG circular ring
-    const fillCircle = document.getElementById('health-gauge-fill');
-    if (fillCircle) {
-      const circumference = 2 * Math.PI * 50; // r=50 -> ~314.16
-      const offset = circumference - (score / 100) * circumference;
-      fillCircle.style.strokeDashoffset = offset;
-      
-      // Dynamic coloring based on score
-      if (score >= 90) {
-        fillCircle.style.stroke = '#10b981'; // Green
-      } else if (score >= 70) {
-        fillCircle.style.stroke = '#fbbf24'; // Amber Gold
-      } else {
-        fillCircle.style.stroke = '#f43f5e'; // Red
-      }
+    // Dynamic coloring based on score
+    if (score >= 90) {
+      fillCircle.style.stroke = '#10b981'; // Green
+    } else if (score >= 70) {
+      fillCircle.style.stroke = '#fbbf24'; // Amber Gold
+    } else {
+      fillCircle.style.stroke = '#f43f5e'; // Red
     }
+  }
 
-    // 3. Render warnings table
-    tbody.innerHTML = '';
-    const warnings = data.warnings || [];
-    
-    if (warnings.length === 0) {
+  // 3. Render warnings table dynamically with transitions
+  const warnings = data.warnings || [];
+
+  if (warnings.length === 0) {
+    const currentRows = Array.from(tbody.querySelectorAll('tr[data-key]'));
+    if (currentRows.length > 0) {
+      currentRows.forEach(row => {
+        row.classList.remove('fade-in-row');
+        row.classList.add('fade-out-row');
+      });
+      setTimeout(() => {
+        tbody.innerHTML = `
+          <tr class="fade-in-row">
+            <td colspan="4" style="text-align: center; padding: 36px; color: var(--color-status-completed); font-weight: 500;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle; margin-right: 6px;"><polyline points="20 6 9 17 4 12"/></svg>
+              Excellent! Your codebase is 100% clean and documented.
+            </td>
+          </tr>
+        `;
+      }, 350);
+    } else {
       tbody.innerHTML = `
-        <tr>
+        <tr class="fade-in-row">
           <td colspan="4" style="text-align: center; padding: 36px; color: var(--color-status-completed); font-weight: 500;">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle; margin-right: 6px;"><polyline points="20 6 9 17 4 12"/></svg>
             Excellent! Your codebase is 100% clean and documented.
           </td>
         </tr>
       `;
-      return;
+    }
+    return;
+  }
+
+  // Clear non-data rows if any
+  const firstRow = tbody.querySelector('tr');
+  if (firstRow && !firstRow.dataset.key) {
+    tbody.innerHTML = '';
+  }
+
+  // Map incoming warnings to keys
+  const newWarningsMap = new Map();
+  warnings.forEach(w => {
+    const key = `${w.file}:${w.scope}:${w.issue}`;
+    newWarningsMap.set(key, w);
+  });
+
+  // Get current rows in DOM
+  const currentRows = Array.from(tbody.querySelectorAll('tr[data-key]'));
+
+  // 1. Remove rows that are no longer present
+  currentRows.forEach(row => {
+    const key = row.dataset.key;
+    if (!newWarningsMap.has(key)) {
+      row.classList.remove('fade-in-row');
+      row.classList.add('fade-out-row');
+      setTimeout(() => {
+        if (row.parentNode === tbody) {
+          tbody.removeChild(row);
+          if (tbody.querySelectorAll('tr[data-key]').length === 0) {
+            renderCodeHealthData(data);
+          }
+        }
+      }, 350);
+    }
+  });
+
+  // 2. Add or update rows
+  warnings.forEach(w => {
+    const key = `${w.file}:${w.scope}:${w.issue}`;
+    let existingRow = null;
+    try {
+      existingRow = tbody.querySelector(`tr[data-key="${CSS.escape(key)}"]`);
+    } catch (e) {
+      existingRow = Array.from(tbody.querySelectorAll('tr[data-key]')).find(r => r.dataset.key === key);
     }
 
-    warnings.forEach(w => {
+    if (existingRow) {
+      const lineCell = existingRow.cells[3];
+      if (lineCell && lineCell.textContent !== String(w.line)) {
+        lineCell.textContent = w.line;
+      }
+    } else {
       const tr = document.createElement('tr');
+      tr.dataset.key = key;
+      tr.className = 'fade-in-row';
       tr.innerHTML = `
         <td class="warning-file">${w.file}</td>
         <td class="warning-scope">${w.scope}</td>
@@ -1244,11 +1349,8 @@ async function loadCodeHealth() {
         <td>${w.line}</td>
       `;
       tbody.appendChild(tr);
-    });
-  } catch (error) {
-    console.error(error);
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load codebase health audit report.</td></tr>';
-  }
+    }
+  });
 }
 
 async function loadArchitectureGuides() {
@@ -1373,6 +1475,10 @@ async function runTestSuite(scope = null) {
   }
 }
 
+/**
+ * Renders the test suite dashboard stats, gauge, and test cases table.
+ * @param {Object} data - The test execution results.
+ */
 function renderTestResults(data) {
   const total = data.stats.total || 0;
   const passed = data.stats.passed || 0;
@@ -1751,6 +1857,11 @@ function formatInlineDiff(changes) {
   return html;
 }
 
+/**
+ * Opens the side-by-side time travel inspection modal.
+ * @param {string} taskId - The task ID.
+ * @param {string} historyId - The history log ID.
+ */
 async function openTimeTravelModal(taskId, historyId) {
   try {
     const response = await fetch(`/api/tasks/${taskId}/history/${historyId}`);
@@ -1843,6 +1954,9 @@ async function openTimeTravelModal(taskId, historyId) {
 }
 
 let isPolling = false;
+/**
+ * Starts the background polling interval to keep tasks and console logs synced.
+ */
 function startPolling() {
   setInterval(async () => {
     if (document.hidden || isPolling) return;
@@ -1863,6 +1977,61 @@ function startPolling() {
                 renderDetailHistoryTimeline(activeTaskId);
               } else {
                 closeDetailDrawer();
+              }
+            }
+          }
+        }
+      }
+
+      // Dynamic polling for Dev Docs & Health subtabs
+      if (currentView === 'DOCS') {
+        if (currentDocsSubtab === 'health') {
+          const url = currentDocsCommit ? `/api/docs/health?commit=${currentDocsCommit}` : '/api/docs/health';
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const dataStr = JSON.stringify(data);
+            if (dataStr !== oldHealthStr) {
+              oldHealthStr = dataStr;
+              renderCodeHealthData(data);
+            }
+          }
+        } else if (currentDocsSubtab === 'tests') {
+          const res = await fetch('/api/docs/tests');
+          if (res.ok) {
+            const data = await res.json();
+            const dataStr = JSON.stringify(data);
+            if (dataStr !== oldTestsStr) {
+              oldTestsStr = dataStr;
+              renderTestResults(data);
+            }
+          }
+        } else if (currentDocsSubtab === 'explorer') {
+          const url = currentDocsCommit ? `/api/docs/metadata?commit=${currentDocsCommit}` : '/api/docs/metadata';
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const dataStr = JSON.stringify(data);
+            if (dataStr !== oldMetadataStr) {
+              oldMetadataStr = dataStr;
+              renderClassExplorerData(data);
+            }
+          }
+        } else if (currentDocsSubtab === 'guides') {
+          const activeBtn = document.querySelector('.guide-btn.active');
+          if (activeBtn) {
+            const guideName = activeBtn.dataset.name;
+            const url = currentDocsCommit ? `/api/docs/guides/${guideName}?commit=${currentDocsCommit}` : `/api/docs/guides/${guideName}`;
+            const res = await fetch(url);
+            if (res.ok) {
+              const data = await res.json();
+              const dataStr = JSON.stringify(data);
+              if (dataStr !== oldGuideStr) {
+                oldGuideStr = dataStr;
+                const pane = document.getElementById('guide-preview-body');
+                if (pane) {
+                  pane.innerHTML = parseMarkdown(data.content);
+                }
               }
             }
           }
