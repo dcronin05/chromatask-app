@@ -243,3 +243,51 @@ class FlaskAPITests(unittest.TestCase):
         self.assertIn("warnings", data)
         self.assertIsInstance(data.get("score"), (int, float))
 
+
+class CodebaseQualityTests(unittest.TestCase):
+    """
+    Integration tests that combine DocService (linter) with the test suite
+    to audit JS, CSS, and HTML codebase quality.
+    """
+    def setUp(self) -> None:
+        """Registers frontend language analyzers on DocService for audits."""
+        from doc_service import DocService, JSCodeAnalyzer, CSSCodeAnalyzer, HTMLCodeAnalyzer
+        self.doc_service = DocService()
+        self.doc_service.register_analyzer(".js", JSCodeAnalyzer)
+        self.doc_service.register_analyzer(".css", CSSCodeAnalyzer)
+        self.doc_service.register_analyzer(".html", HTMLCodeAnalyzer)
+
+    def test_javascript_quality(self) -> None:
+        """Runs lint checks on src/main.js and validates metadata parsing."""
+        js_file = "src/main.js"
+        report = self.doc_service.analyze_project([js_file])
+        stats = report.get("stats", {})
+        
+        # Verify analyzer parsed files and returned valid metrics
+        self.assertEqual(report.get("files_scanned"), 1)
+        self.assertGreater(stats.get("lines", 0), 0)
+        self.assertIn("warnings", report)
+        self.assertIsInstance(report.get("score"), int)
+
+    def test_css_quality(self) -> None:
+        """Runs lint checks on src/style.css and validates metadata parsing."""
+        css_file = "src/style.css"
+        report = self.doc_service.analyze_project([css_file])
+        stats = report.get("stats", {})
+        
+        self.assertEqual(report.get("files_scanned"), 1)
+        self.assertGreater(stats.get("lines", 0), 0)
+        self.assertIn("warnings", report)
+        self.assertIsInstance(report.get("score"), int)
+
+    def test_html_quality(self) -> None:
+        """Runs lint checks on index.html and validates metadata parsing."""
+        html_file = "index.html"
+        report = self.doc_service.analyze_project([html_file])
+        stats = report.get("stats", {})
+        
+        self.assertEqual(report.get("files_scanned"), 1)
+        self.assertGreater(stats.get("lines", 0), 0)
+        self.assertIn("warnings", report)
+        self.assertIsInstance(report.get("score"), int)
+

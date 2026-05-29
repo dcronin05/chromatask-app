@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from services import TaskService
-from doc_service import DocService, PythonCodeAnalyzer
+from doc_service import DocService, PythonCodeAnalyzer, JSCodeAnalyzer, CSSCodeAnalyzer, HTMLCodeAnalyzer
 from test_service import TestRunnerService
 
 app: Flask = Flask(__name__)
@@ -17,10 +17,16 @@ SEED_FILE: str = "gemini-code-1780008469746.json"
 task_service: TaskService = TaskService(DB_FILE)
 test_runner_service: TestRunnerService = TestRunnerService()
 
-# Initialize DocService and register Python AST analyzer
+# Initialize DocService and register language analyzers
 code_doc_service: DocService = DocService(os.path.dirname(os.path.abspath(__file__)))
 code_doc_service.register_analyzer(".py", PythonCodeAnalyzer)
-CODEBASE_FILES: List[str] = ["models.py", "repositories.py", "services.py", "server.py", "doc_service.py"]
+code_doc_service.register_analyzer(".js", JSCodeAnalyzer)
+code_doc_service.register_analyzer(".css", CSSCodeAnalyzer)
+code_doc_service.register_analyzer(".html", HTMLCodeAnalyzer)
+CODEBASE_FILES: List[str] = [
+    "models.py", "repositories.py", "services.py", "server.py", "doc_service.py",
+    "src/main.js", "src/style.css", "index.html"
+]
 
 # ==========================================
 # DATABASE INITIALIZATION

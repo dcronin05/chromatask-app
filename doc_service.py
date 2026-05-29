@@ -310,6 +310,394 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
             })
 
 
+class JSCodeAnalyzer(BaseCodeAnalyzer):
+    """
+    Concrete analyzer for JavaScript codebase using regex parsing.
+    Validates function naming, JSDoc docstrings, method length, console.log, and eval.
+    """
+    def analyze(self) -> Dict[str, Any]:
+        """
+        Parses and runs visual code analysis on the target JS file.
+        Returns a report detailing classes, functions, code lines, and issues.
+        """
+        if not os.path.exists(self.file_path):
+            return {
+                "metadata": {
+                    "file_name": os.path.basename(self.file_path),
+                    "classes": [],
+                    "stats": {"lines": 0, "comments": 0}
+                },
+                "health": {"score": 100, "warnings": []}
+            }
+
+        content = self._read_content()
+        lines = content.splitlines()
+        comment_lines = self._count_comments(lines)
+        warnings = self._scan_warnings(lines)
+        score = self._calculate_score(warnings)
+
+        return {
+            "metadata": {
+                "file_name": os.path.basename(self.file_path),
+                "classes": [],
+                "stats": {
+                    "lines": len(lines),
+                    "comments": comment_lines
+                }
+            },
+            "health": {
+                "score": score,
+                "warnings": warnings
+            }
+        }
+
+    def _read_content(self) -> str:
+        """Reads file content from git commit or local filesystem."""
+        if self.commit_hash:
+            import subprocess
+            rel_path = os.path.relpath(self.file_path)
+            cmd = ["git", "show", f"{self.commit_hash}:{rel_path}"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout
+            return ""
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def _count_comments(self, lines: List[str]) -> int:
+        """Counts block and inline comments in JavaScript source lines."""
+        comment_lines = 0
+        in_block = False
+        for line in lines:
+            line_strip = line.strip()
+            if in_block:
+                comment_lines += 1
+                if "*/" in line_strip:
+                    in_block = False
+            else:
+                if line_strip.startswith("//"):
+                    comment_lines += 1
+                elif line_strip.startswith("/*"):
+                    comment_lines += 1
+                    if "*/" not in line_strip:
+                        in_block = True
+        return comment_lines
+
+    def _scan_warnings(self, lines: List[str]) -> List[Dict[str, Any]]:
+        """Scans lines for naming violations, length, and banned operators."""
+        warnings: List[Dict[str, Any]] = []
+        func_pattern = re.compile(
+            r"(?:function\s+([a-zA-Z0-9_$]+)\s*\()|"
+            r"(?:(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:\([^)]*\)|[a-zA-Z0-9_$]+)\s*=>)|"
+            r"(?:^\s*(?!(?:if|for|while|switch|catch)\b)([a-zA-Z0-9_$]+)\s*\([^)]*\)\s*\{)"
+        )
+        for i, line in enumerate(lines):
+            line_no = i + 1
+            if "console.log(" in line:
+                warnings.append({
+                    "line": line_no, "issue": "Console log left in code.",
+                    "severity": "INFO", "scope": "Global"
+                })
+            if "eval(" in line:
+                warnings.append({
+                    "line": line_no, "issue": "Avoid using eval() for security reasons.",
+                    "severity": "WARNING", "scope": "Global"
+                })
+
+            match = func_pattern.search(line)
+            if match:
+                self._check_function(lines, i, match, warnings)
+        return warnings
+
+    def _check_function(self, lines: List[str], i: int, match: Any, warnings: List[Dict[str, Any]]) -> None:
+        """Inspects single function declaration details."""
+        func_name = match.group(1) or match.group(2) or match.group(3)
+        if not func_name:
+            return
+        scope = f"Function {func_name}"
+        line_no = i + 1
+
+        # Check Naming
+        if func_name[0].isupper():
+            if not re.match(r"^[A-Z][a-zA-Z0-9]*$", func_name):
+                warnings.append({
+                    "line": line_no, "severity": "WARNING", "scope": scope,
+                    "issue": f"Function '{func_name}' should use PascalCase for class constructors."
+                })
+        else:
+            if not re.match(r"^[a-z][a-zA-Z0-9]*$", func_name):
+                warnings.append({
+                    "line": line_no, "severity": "WARNING", "scope": scope,
+                    "issue": f"Function '{func_name}' should use camelCase naming convention."
+                })
+
+        # Check JSDoc
+        has_jsdoc = False
+        for j in range(max(0, i - 5), i):
+            prev = lines[j].strip()
+            if "/**" in prev or "*/" in prev or prev.startswith("//") or prev.startswith("*"):
+                has_jsdoc = True
+                break
+        if not has_jsdoc:
+            warnings.append({
+                "line": line_no, "severity": "WARNING", "scope": scope,
+                "issue": f"Function '{func_name}' is missing descriptive comments."
+            })
+
+        # Check Length
+        func_lines = 0
+        brace_count = 0
+        started = False
+        for k in range(i, len(lines)):
+            func_lines += 1
+            k_line = lines[k]
+            if "{" in k_line:
+                brace_count += k_line.count("{")
+                started = True
+            if "}" in k_line:
+                brace_count -= k_line.count("}")
+            if started and brace_count <= 0:
+                break
+        if func_lines > 50:
+            warnings.append({
+                "line": line_no, "severity": "WARNING", "scope": scope,
+                "issue": f"Function '{func_name}' exceeds 50 lines ({func_lines} lines)."
+            })
+
+    def _calculate_score(self, warnings: List[Dict[str, Any]]) -> int:
+        """Deducts score values based on severity of active warnings."""
+        score = 100
+        for w in warnings:
+            if w["severity"] == "ERROR":
+                score -= 5
+            elif w["severity"] == "WARNING":
+                score -= 3
+            else:
+                score -= 1
+        return max(0, score)
+
+
+class CSSCodeAnalyzer(BaseCodeAnalyzer):
+    """
+    Concrete analyzer for CSS stylesheets using regex parsing.
+    Validates theme color variables usage, !important overrides, and style rules.
+    """
+    def analyze(self) -> Dict[str, Any]:
+        """
+        Parses and runs visual code analysis on the target CSS file.
+        Returns a report detailing file stats and code quality warnings.
+        """
+        if not os.path.exists(self.file_path):
+            return {
+                "metadata": {
+                    "file_name": os.path.basename(self.file_path),
+                    "classes": [],
+                    "stats": {"lines": 0, "comments": 0}
+                },
+                "health": {"score": 100, "warnings": []}
+            }
+
+        content = self._read_content()
+        lines = content.splitlines()
+        comment_lines = self._count_comments(lines)
+        warnings = self._scan_warnings(lines)
+        score = self._calculate_score(warnings)
+
+        return {
+            "metadata": {
+                "file_name": os.path.basename(self.file_path),
+                "classes": [],
+                "stats": {
+                    "lines": len(lines),
+                    "comments": comment_lines
+                }
+            },
+            "health": {
+                "score": score,
+                "warnings": warnings
+            }
+        }
+
+    def _read_content(self) -> str:
+        """Reads stylesheet file content."""
+        if self.commit_hash:
+            import subprocess
+            rel_path = os.path.relpath(self.file_path)
+            cmd = ["git", "show", f"{self.commit_hash}:{rel_path}"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout
+            return ""
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def _count_comments(self, lines: List[str]) -> int:
+        """Counts comment lines in stylesheet."""
+        comment_lines = 0
+        in_block = False
+        for line in lines:
+            line_strip = line.strip()
+            if in_block:
+                comment_lines += 1
+                if "*/" in line_strip:
+                    in_block = False
+            else:
+                if line_strip.startswith("/*") or line_strip.endswith("*/"):
+                    comment_lines += 1
+                    if "*/" not in line_strip:
+                        in_block = True
+        return comment_lines
+
+    def _scan_warnings(self, lines: List[str]) -> List[Dict[str, Any]]:
+        """Scans lines for override rules and hardcoded styling variables."""
+        warnings: List[Dict[str, Any]] = []
+        for i, line in enumerate(lines):
+            line_no = i + 1
+            line_strip = line.strip()
+            if line_strip.startswith("/*") or line_strip.startswith("*") or not line_strip:
+                continue
+
+            if "!important" in line_strip:
+                warnings.append({
+                    "line": line_no, "severity": "WARNING", "scope": "Styles",
+                    "issue": "Avoid using !important overrides in style rules."
+                })
+
+            if not line_strip.startswith("--"):
+                # Matches hex colors
+                hex_colors = re.findall(r"#([a-fA-F0-9]{3,8})\b", line_strip)
+                color_funcs = re.findall(r"\b(rgb|rgba|hsl|hsla)\(", line_strip)
+                color_words = re.findall(r"\b(color|background|border)\s*:\s*(red|blue|green|black|white)\b", line_strip)
+                if hex_colors or color_funcs or color_words:
+                    warnings.append({
+                        "line": line_no, "severity": "WARNING", "scope": "Styles",
+                        "issue": "Hardcoded color value found. Use CSS theme variables instead."
+                    })
+        return warnings
+
+    def _calculate_score(self, warnings: List[Dict[str, Any]]) -> int:
+        """Deducts score based on warning severity."""
+        score = 100
+        for w in warnings:
+            if w["severity"] == "WARNING":
+                score -= 3
+            else:
+                score -= 1
+        return max(0, score)
+
+
+class HTMLCodeAnalyzer(BaseCodeAnalyzer):
+    """
+    Concrete analyzer for HTML markup files using regex parsing.
+    Validates inline styles, alt accessibility attributes, and unique IDs.
+    """
+    def analyze(self) -> Dict[str, Any]:
+        """
+        Parses and runs visual code analysis on the target HTML file.
+        Returns a report detailing file stats and code quality warnings.
+        """
+        if not os.path.exists(self.file_path):
+            return {
+                "metadata": {
+                    "file_name": os.path.basename(self.file_path),
+                    "classes": [],
+                    "stats": {"lines": 0, "comments": 0}
+                },
+                "health": {"score": 100, "warnings": []}
+            }
+
+        content = self._read_content()
+        lines = content.splitlines()
+        comment_lines = self._count_comments(lines)
+        warnings = self._scan_warnings(lines)
+        score = self._calculate_score(warnings)
+
+        return {
+            "metadata": {
+                "file_name": os.path.basename(self.file_path),
+                "classes": [],
+                "stats": {
+                    "lines": len(lines),
+                    "comments": comment_lines
+                }
+            },
+            "health": {
+                "score": score,
+                "warnings": warnings
+            }
+        }
+
+    def _read_content(self) -> str:
+        """Reads markup file content."""
+        if self.commit_hash:
+            import subprocess
+            rel_path = os.path.relpath(self.file_path)
+            cmd = ["git", "show", f"{self.commit_hash}:{rel_path}"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout
+            return ""
+        with open(self.file_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    def _count_comments(self, lines: List[str]) -> int:
+        """Counts HTML comment lines."""
+        comment_lines = 0
+        in_comment = False
+        for line in lines:
+            line_strip = line.strip()
+            if in_comment:
+                comment_lines += 1
+                if "-->" in line_strip:
+                    in_comment = False
+            else:
+                if line_strip.startswith("<!--"):
+                    comment_lines += 1
+                    if "-->" not in line_strip:
+                        in_comment = True
+        return comment_lines
+
+    def _scan_warnings(self, lines: List[str]) -> List[Dict[str, Any]]:
+        """Audits markup lines for accessibility, inline styles, and duplicate IDs."""
+        warnings: List[Dict[str, Any]] = []
+        observed_ids: Dict[str, int] = {}
+        for i, line in enumerate(lines):
+            line_no = i + 1
+            line_strip = line.strip()
+
+            if 'style="' in line_strip:
+                warnings.append({
+                    "line": line_no, "severity": "WARNING", "scope": "Markup",
+                    "issue": "Avoid inline styles; use CSS classes to preserve styling themes."
+                })
+
+            if "<img" in line_strip and "alt=" not in line_strip:
+                warnings.append({
+                    "line": line_no, "severity": "WARNING", "scope": "Markup",
+                    "issue": "Image element is missing an alt accessibility attribute."
+                })
+
+            ids = re.findall(r'\bid\s*=\s*["\']([^"\']+)["\']', line_strip)
+            for element_id in ids:
+                observed_ids[element_id] = observed_ids.get(element_id, 0) + 1
+                if observed_ids[element_id] > 1:
+                    warnings.append({
+                        "line": line_no, "severity": "WARNING", "scope": "Markup",
+                        "issue": f"Duplicate element ID '{element_id}' found in document."
+                    })
+        return warnings
+
+    def _calculate_score(self, warnings: List[Dict[str, Any]]) -> int:
+        """Deducts scores based on warning severity."""
+        score = 100
+        for w in warnings:
+            if w["severity"] == "WARNING":
+                score -= 3
+            else:
+                score -= 1
+        return max(0, score)
+
+
 class DocService:
     """
     Orchestrates codebase documentation parsing and analysis.
