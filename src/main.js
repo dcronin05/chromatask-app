@@ -341,13 +341,29 @@ function syncDynamicFields(taskObjects) {
     'attachment_type'
   ]);
 
+  // Scan all tasks to find keys that ever hold a non-null object (non-array)
+  taskObjects.forEach(task => {
+    Object.keys(task).forEach(key => {
+      const val = task[key];
+      if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+        ignoredKeys.add(key);
+      }
+    });
+  });
+
+  // Remove any dynamically registered entries that have now been marked as ignored
+  for (let i = TASK_DISPLAY_CONFIG.length - 1; i >= 0; i--) {
+    const entry = TASK_DISPLAY_CONFIG[i];
+    if (entry.isDynamic && ignoredKeys.has(entry.key)) {
+      TASK_DISPLAY_CONFIG.splice(i, 1);
+    }
+  }
+
   taskObjects.forEach(task => {
     Object.keys(task).forEach(key => {
       if (ignoredKeys.has(key)) return;
 
       const val = task[key];
-      // Skip nested objects dynamically to prevent [object Object] rendering
-      if (val !== null && typeof val === 'object' && !Array.isArray(val)) return;
       
       // Check if key is already in display config
       const exists = TASK_DISPLAY_CONFIG.some(c => c.key === key);
@@ -956,9 +972,12 @@ async function renderDetailHistoryTimeline(taskId) {
               if (c.field === 'due_date') {
                 oldVal = oldVal ? formatDate(oldVal) : 'None';
                 newVal = newVal ? formatDate(newVal) : 'None';
-              } else if (typeof oldVal === 'object' || Array.isArray(oldVal)) {
-                oldVal = Array.isArray(oldVal) ? `${oldVal.length} items` : 'Updated';
-                newVal = Array.isArray(newVal) ? `${newVal.length} items` : 'Updated';
+              } else if (Array.isArray(oldVal) || Array.isArray(newVal)) {
+                oldVal = Array.isArray(oldVal) ? `${oldVal.length} items` : '0 items';
+                newVal = Array.isArray(newVal) ? `${newVal.length} items` : '0 items';
+              } else if ((oldVal && typeof oldVal === 'object') || (newVal && typeof newVal === 'object')) {
+                oldVal = oldVal ? 'Updated' : 'None';
+                newVal = newVal ? 'Updated' : 'None';
               }
               
               return `
@@ -1760,32 +1779,7 @@ function formatInlineDiff(changes) {
     let oldVal = c.old;
     let newVal = c.new;
     
-    if (Array.isArray(oldVal) || Array.isArray(newVal)) {
-      const oldArr = Array.isArray(oldVal) ? oldVal : [];
-      const newArr = Array.isArray(newVal) ? newVal : [];
-      
-      const removed = oldArr.filter(x => !newArr.includes(x));
-      const added = newArr.filter(x => !oldArr.includes(x));
-      const unchanged = oldArr.filter(x => newArr.includes(x));
-      
-      let diffHtml = '';
-      removed.forEach(r => {
-        diffHtml += `<span class="diff-val-box diff-deleted">#${r}</span> `;
-      });
-      added.forEach(a => {
-        diffHtml += `<span class="diff-val-box diff-added">#${a}</span> `;
-      });
-      unchanged.forEach(u => {
-        diffHtml += `<span class="diff-val-box diff-unchanged">#${u}</span> `;
-      });
-      
-      html += `
-        <div class="timeline-diff-row">
-          <span class="timeline-diff-field">${c.field.replace(/_/g, ' ')}</span>
-          <span class="timeline-diff-vals">${diffHtml || 'None'}</span>
-        </div>
-      `;
-    } else if (c.field === 'collaborators') {
+    if (c.field === 'collaborators') {
       const oldNames = (oldVal || []).map(col => `${col.name} (${col.role})`);
       const newNames = (newVal || []).map(col => `${col.name} (${col.role})`);
       
@@ -1829,6 +1823,31 @@ function formatInlineDiff(changes) {
         <div class="timeline-diff-row">
           <span class="timeline-diff-field">video bookmarks</span>
           <span class="timeline-diff-vals">${diffHtml || 'No changes'}</span>
+        </div>
+      `;
+    } else if (Array.isArray(oldVal) || Array.isArray(newVal)) {
+      const oldArr = Array.isArray(oldVal) ? oldVal : [];
+      const newArr = Array.isArray(newVal) ? newVal : [];
+      
+      const removed = oldArr.filter(x => !newArr.includes(x));
+      const added = newArr.filter(x => !oldArr.includes(x));
+      const unchanged = oldArr.filter(x => newArr.includes(x));
+      
+      let diffHtml = '';
+      removed.forEach(r => {
+        diffHtml += `<span class="diff-val-box diff-deleted">#${r}</span> `;
+      });
+      added.forEach(a => {
+        diffHtml += `<span class="diff-val-box diff-added">#${a}</span> `;
+      });
+      unchanged.forEach(u => {
+        diffHtml += `<span class="diff-val-box diff-unchanged">#${u}</span> `;
+      });
+      
+      html += `
+        <div class="timeline-diff-row">
+          <span class="timeline-diff-field">${c.field.replace(/_/g, ' ')}</span>
+          <span class="timeline-diff-vals">${diffHtml || 'None'}</span>
         </div>
       `;
     } else {
@@ -2173,6 +2192,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Time Travel Modal
   document.getElementById('time-travel-close-btn').addEventListener('click', () => closeModal('time-travel-modal'));
   document.getElementById('time-travel-cancel-btn').addEventListener('click', () => closeModal('time-travel-modal'));
+
+  // Task Modal controls
+  document.getElementById('btn-add-task').addEventListener('click', () => {
+    document.getElementById('task-form').reset();
+    openModal('task-modal');
+  });
+  document.getElementById('modal-close').addEventListener('click', () => closeModal('task-modal'));
+  document.getElementById('form-cancel').addEventListener('click', () => closeModal('task-modal'));
 
   // Drawer Main delete/restore button
   document.getElementById('btn-delete-task').addEventListener('click', () => {
