@@ -56,4 +56,28 @@ The backend codebase is divided into four distinct components to enforce the **S
 The programmatic documentation and linter console uses the **Strategy Pattern** to ensure language extensibility:
 - **`BaseCodeAnalyzer`**: Abstract base class requiring an `analyze()` implementation.
 - **`PythonCodeAnalyzer`**: Analyzes Python source code syntax trees via the native `ast` module.
-- **`DocService`**: Orchestrates scanning the project, mapping extensions (e.g. `.py` ➜ `PythonCodeAnalyzer`), and building a unified codebase dashboard. To add JS or CSS analysis, we simply write a new subclass of `BaseCodeAnalyzer` and register it on `DocService`.
+- **`JSCodeAnalyzer`**: Audits JavaScript source files using regex syntax checks.
+- **`CSSCodeAnalyzer`**: Audits CSS stylesheets for theme and variable conformity.
+- **`HTMLCodeAnalyzer`**: Audits HTML markup for accessibility and style conformance.
+- **`DocService`**: Orchestrates scanning the project, mapping extensions (e.g. `.py` ➜ `PythonCodeAnalyzer`, `.js` ➜ `JSCodeAnalyzer`, etc.), and building a unified codebase dashboard.
+
+---
+
+## 3. Frontend Task Display & Dynamic Schema Engine
+
+ChromaTask enforces a single source of truth for display structures, dynamically matching backend database configurations:
+
+### A. Display Configurations (`TASK_DISPLAY_CONFIG`)
+Located in `src/main.js`, this unified registry maps task properties (`title`, `description`, `status`, `priority`, `due_date`, `task_specific_tags`, `collaborators`, and `curated_video_bookmarks`). Each entry specifies:
+- `key`: The JSON data property name.
+- `label`: Friendly header/label text.
+- `render()`: Standard formatting function for textual display.
+- `equals()`: Equivalence checker for version comparing and diff tracking.
+- `renderCard()` / `renderDetail()`: Dynamic DOM constructors for task card rendering and detail drawer input fields.
+
+### B. Dynamic Schema Engine (`syncDynamicFields`)
+To support ad-hoc metadata fields dynamically added to the database (or custom columns):
+- scans all task records at runtime for unrecognized keys.
+- dynamically injects a configuration entry into `TASK_DISPLAY_CONFIG` to build corresponding input fields and timeline descriptors.
+- **Object Filtering**: Auto-registered fields skip nested object shapes (like `media_metadata`) by running pre-scan checks on all tasks to prevent formatting conflicts and invalid `[object Object]` rendering outputs.
+- **Auto-Pruning**: Dynamically removes configuration entries from the active list if their database values are cleared or re-categorized as system-ignored keys.

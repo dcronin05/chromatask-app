@@ -37,7 +37,8 @@ Clicking the **Show Highlighted Diff** button on any timeline entry expands an i
 - **Red background (`.diff-deleted`)**: Represents removed values or old states.
 - **Green background (`.diff-added`)**: Represents added values or new states.
 - **Unchanged values (`.diff-unchanged`)**: Rendered in a muted neutral style.
-- Handles list-based properties (like tags and collaborators) by diffing item differences.
+- **List-based properties (tags, collaborators, bookmarks)**: Handles list diffing. Custom list fields like `collaborators` have specialized diff layouts showing name, role, and invitation status changes side-by-side, which are evaluated prior to generic array checks to avoid rendering problems.
+- **Null Value Formatting**: If a value is updated to or from `null`, it is formatted explicitly as `"None"` rather than triggering generic object markers or repeating identical values in the description text.
 
 ### B. Time-Travel Version Inspector
 Clicking the **Clock Icon** next to any timeline log opens a side-by-side split comparison:
@@ -54,3 +55,4 @@ Clicking **Rollback to this Version** in the Inspector overlay triggers a databa
 2. Calls the model's `update_fields()` method to diff the target state against the current live state.
 3. Saves the modifications back to the repository.
 4. Inserts a new `ROLLBACK` audit event into the task timeline history logs, documenting the reversion.
+

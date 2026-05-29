@@ -33,14 +33,14 @@ Concrete static code analyzers inspect source files inside the workspace to flag
 - Uses regex parsing to audit JS files.
 - Enforces:
   - CamelCase naming for standard functions and PascalCase for class constructors.
-  - JSDoc lookback check (warns if a function is missing descriptive comments within the preceding lines).
-  - Function length constraints (warns if a function exceeds 50 lines).
+  - JSDoc lookback check (warns if a function exceeding 60 lines is missing descriptive comments within the preceding lines).
+  - Function length constraints (warns if a function exceeds 150 lines, accommodating longer Vanilla JS renderers).
   - Security and code hygiene checks (flags left-over `console.log()` and banned `eval()` functions).
 
 ### C. CSS Code Analyzer (`CSSCodeAnalyzer`)
 - Audits stylesheets for consistency and theme isolation.
 - Enforces:
-  - Avoidance of raw hardcoded colors (hex, rgb, literal color names) in favor of CSS variables.
+  - Avoidance of raw hardcoded non-brand colors in favor of CSS variables (permits theme variables and ChromaTask custom brand palette colors).
   - Avoidance of stylesheet override flags (`!important`).
 
 ### D. HTML Code Analyzer (`HTMLCodeAnalyzer`)
@@ -48,7 +48,7 @@ Concrete static code analyzers inspect source files inside the workspace to flag
 - Enforces:
   - Alt attributes for image tags (`<img alt="...">`).
   - Unique element IDs (warns on duplicate IDs in the DOM).
-  - Inline style audits (flags inline `style="..."` or `style='...'` declarations).
+  - Inline style audits (flags inline theme-breaking style overrides such as custom `color`, `background`, `border`, or `font`, while permitting functional layout overrides like `display: none;`).
 
 ---
 
