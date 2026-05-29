@@ -1,5 +1,6 @@
 import unittest
 import time
+import datetime
 from typing import Any, Dict, List, Optional
 
 class JSONTestResult(unittest.TestResult):
@@ -29,7 +30,8 @@ class JSONTestResult(unittest.TestResult):
             "class": test.__class__.__name__,
             "status": "PASS",
             "duration": round(duration, 4),
-            "message": "Passed successfully."
+            "message": "Passed successfully.",
+            "last_run": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
 
     def addFailure(self, test: unittest.TestCase, err: Any) -> None:
@@ -43,7 +45,8 @@ class JSONTestResult(unittest.TestResult):
             "class": test.__class__.__name__,
             "status": "FAIL",
             "duration": round(duration, 4),
-            "message": self._exc_info_to_string(err, test)
+            "message": self._exc_info_to_string(err, test),
+            "last_run": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
 
     def addError(self, test: unittest.TestCase, err: Any) -> None:
@@ -57,7 +60,8 @@ class JSONTestResult(unittest.TestResult):
             "class": test.__class__.__name__,
             "status": "ERROR",
             "duration": round(duration, 4),
-            "message": self._exc_info_to_string(err, test)
+            "message": self._exc_info_to_string(err, test),
+            "last_run": datetime.datetime.now(datetime.timezone.utc).isoformat()
         })
 
 
@@ -112,7 +116,8 @@ class TestRunnerService:
                     "class": class_name,
                     "status": "PENDING",
                     "duration": 0.0,
-                    "message": "Not run yet."
+                    "message": "Not run yet.",
+                    "last_run": None
                 }
 
         # Remove deleted tests from cache
@@ -164,7 +169,8 @@ class TestRunnerService:
                 self.all_tests_cache[key].update({
                     "status": res["status"],
                     "duration": res["duration"],
-                    "message": res["message"]
+                    "message": res["message"],
+                    "last_run": res.get("last_run")
                 })
 
         # Recalculate stats based on the latest cache state

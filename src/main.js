@@ -1453,6 +1453,11 @@ function renderTestResults(data) {
       `;
     }
 
+    let lastRunHTML = '';
+    if (test.last_run) {
+      lastRunHTML = `<span class="text-muted" style="font-size: 11px;"> | Run: ${formatDate(test.last_run)}</span>`;
+    }
+
     const caseScope = `${test.class}.${test.name}`;
 
     tr.innerHTML = `
@@ -1470,6 +1475,7 @@ function renderTestResults(data) {
         <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <span class="text-muted" style="font-size: 11px;">Duration: ${test.duration.toFixed(3)}s</span>
+            ${lastRunHTML}
             <button class="btn-run-single-test" data-scope="${caseScope}">
               <span>▶</span> Run Case
             </button>
