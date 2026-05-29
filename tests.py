@@ -178,3 +178,68 @@ class TaskServiceTests(unittest.TestCase):
         history = self.service.get_task_history(task_id)
         self.assertEqual(len(history), 3) # Created + Updated + Rollback log
         self.assertEqual(history[0]["action"], "ROLLBACK")
+
+
+class FlaskAPITests(unittest.TestCase):
+    """
+    Integration tests for the Flask API endpoints.
+    Uses app.test_client() to verify REST responses.
+    """
+    def setUp(self) -> None:
+        """Sets up a temporary database and overrides server task_service."""
+        import server
+        self.original_service = server.task_service
+        self.db_path = "db_api_integration_test.json"
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        # Create a new service instance pointing to the integration test database
+        server.task_service = TaskService(self.db_path)
+        self.client = server.app.test_client()
+
+    def tearDown(self) -> None:
+        """Restores the original task_service and cleans up integration db."""
+        import server
+        server.task_service = self.original_service
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+
+    def test_get_tasks_endpoint(self) -> None:
+        """Verifies GET /api/tasks returns a success status code and task list."""
+        response = self.client.get("/api/tasks")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIsInstance(data, list)
+
+    def test_create_task_endpoint(self) -> None:
+        """Verifies POST /api/tasks creates a task and returns 201."""
+        payload = {"title": "API Test Task", "description": "API Test Desc"}
+        response = self.client.post("/api/tasks", json=payload)
+        self.assertEqual(response.status_code, 201)
+        data = response.get_json()
+        self.assertIsNotNone(data.get("task_id"))
+        self.assertEqual(data.get("title"), "API Test Task")
+
+    def test_update_task_endpoint(self) -> None:
+        """Verifies PUT /api/tasks/<task_id> updates fields and returns 200."""
+        # Create a task first
+        payload = {"title": "API Test Task To Update"}
+        create_resp = self.client.post("/api/tasks", json=payload)
+        task_id = create_resp.get_json()["task_id"]
+
+        # Update the task
+        update_payload = {"title": "Updated API Title", "priority": "LOW"}
+        response = self.client.put(f"/api/tasks/{task_id}", json=update_payload)
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertEqual(data.get("title"), "Updated API Title")
+        self.assertEqual(data.get("priority"), "LOW")
+
+    def test_get_docs_health_endpoint(self) -> None:
+        """Verifies GET /api/docs/health returns the codebase quality health report."""
+        response = self.client.get("/api/docs/health")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn("score", data)
+        self.assertIn("warnings", data)
+        self.assertIsInstance(data.get("score"), (int, float))
+
