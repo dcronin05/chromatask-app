@@ -9,11 +9,12 @@ class BaseCodeAnalyzer(ABC):
     Abstract Base Class for programming language source code analyzers.
     Follows Strategy Pattern to support future language extensions (JS, CSS, etc.).
     """
-    def __init__(self, file_path: str) -> None:
+    def __init__(self, file_path: str, commit_hash: Optional[str] = None) -> None:
         """
         Initializes the analyzer with the target file path.
         """
         self.file_path: str = file_path
+        self.commit_hash: Optional[str] = commit_hash
 
     @abstractmethod
     def analyze(self) -> Dict[str, Any]:
@@ -76,9 +77,20 @@ class PythonCodeAnalyzer(BaseCodeAnalyzer):
     def _read_file_stats(self) -> Tuple[str, int, int]:
         """
         Reads the file content and counts lines and comment lines.
+        If self.commit_hash is provided, it retrieves content via git.
         """
-        with open(self.file_path, "r", encoding="utf-8") as f:
-            content = f.read()
+        if self.commit_hash:
+            import subprocess
+            rel_path = os.path.relpath(self.file_path)
+            cmd = ["git", "show", f"{self.commit_hash}:{rel_path}"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                return "", 0, 0
+            content = result.stdout
+        else:
+            with open(self.file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
         lines = content.splitlines()
         total_lines = len(lines)
         comment_lines = sum(1 for l in lines if l.strip().startswith("#"))
@@ -314,12 +326,12 @@ class DocService:
         """Registers a BaseCodeAnalyzer subclass for a specific file extension."""
         self._analyzers[ext] = analyzer_class
 
-    def analyze_project(self, files_list: List[str]) -> Dict[str, Any]:
+    def analyze_project(self, files_list: List[str], commit_hash: Optional[str] = None) -> Dict[str, Any]:
         """Runs the registered analyzers across the given list of files and aggregates stats."""
-        reports = self._run_analyzers(files_list)
+        reports = self._run_analyzers(files_list, commit_hash)
         return self._aggregate_metrics(reports)
 
-    def _run_analyzers(self, files_list: List[str]) -> List[Dict[str, Any]]:
+    def _run_analyzers(self, files_list: List[str], commit_hash: Optional[str] = None) -> List[Dict[str, Any]]:
         """
         Runs registered analyzers on each file path in the list.
         """
@@ -330,7 +342,7 @@ class DocService:
 
             analyzer_class = self._analyzers.get(ext)
             if analyzer_class:
-                analyzer = analyzer_class(file_path)
+                analyzer = analyzer_class(file_path, commit_hash)
                 report: Dict[str, Any] = analyzer.analyze()
                 report["file_path"] = rel_path
                 reports.append(report)
@@ -384,14 +396,47 @@ class DocService:
             "files_reports": reports
         }
 
-    def get_markdown_guide(self, guide_name: str) -> str:
+    def get_markdown_guide(self, guide_name: str, commit_hash: Optional[str] = None) -> str:
         """Retrieves and reads a static markdown documentation guide."""
         docs_dir: str = os.path.join(self.project_path, "docs")
         # Sanitize filename
         safe_name: str = re.sub(r"[^a-zA-Z0-9_\-]", "", guide_name)
         file_path: str = os.path.join(docs_dir, f"{safe_name}.md")
         
-        if os.path.exists(file_path):
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read()
-        return ""
+        if commit_hash:
+            import subprocess
+            rel_path = os.path.relpath(file_path)
+            cmd = ["git", "show", f"{commit_hash}:{rel_path}"]
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                return result.stdout
+            return ""
+        else:
+            if os.path.exists(file_path):
+                with open(file_path, "r", encoding="utf-8") as f:
+                    return f.read()
+            return ""
+
+    def get_recent_commits(self, limit: int = 15) -> List[Dict[str, str]]:
+        """
+        Retrieves the list of recent Git commits.
+        Returns a list of dicts: [{'hash': str, 'author': str, 'date': str, 'subject': str}]
+        """
+        import subprocess
+        # Format string: hash (%h), author name (%an), author date short (%ad), subject (%s)
+        cmd = ["git", "log", f"-n {limit}", "--pretty=format:%h|%an|%ad|%s", "--date=short"]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            return []
+        
+        commits = []
+        for line in result.stdout.strip().splitlines():
+            parts = line.split("|", 3)
+            if len(parts) == 4:
+                commits.append({
+                    "hash": parts[0],
+                    "author": parts[1],
+                    "date": parts[2],
+                    "subject": parts[3]
+                })
+        return commits
