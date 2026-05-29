@@ -1783,6 +1783,11 @@ body {
   border: 1px solid var(--border-light);
 }
 
+.tests-table-wrapper {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+}
+
 .warnings-table td {
   padding: 12px 16px;
   font-size: 12px;
