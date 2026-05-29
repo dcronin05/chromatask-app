@@ -771,6 +771,8 @@ function loadDocsSubtab(subtab) {
     loadCodeHealth();
   } else if (subtab === 'guides') {
     loadArchitectureGuides();
+  } else if (subtab === 'tests') {
+    loadTestSuite();
   }
 }
 
@@ -1004,6 +1006,188 @@ async function fetchAndShowGuide(guideName) {
     console.error(error);
     pane.innerHTML = '<div style="text-align: center; color: #f43f5e; padding: 64px 20px;">Failed to read guide.</div>';
   }
+}
+
+async function loadTestSuite() {
+  const tbody = document.getElementById('tests-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 24px;">Loading test suite status...</td></tr>';
+
+  try {
+    const response = await fetch('/api/docs/tests');
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    renderTestResults(data);
+  } catch (error) {
+    console.error('Failed to load test suite status:', error);
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--color-danger); padding: 24px;">Failed to load test suite.</td></tr>';
+  }
+}
+
+async function runTestSuite(scope = null) {
+  const globalBtn = document.getElementById('btn-run-tests');
+  const globalSpinner = document.getElementById('tests-btn-spinner');
+  const globalBtnText = document.getElementById('btn-run-tests-text');
+  
+  if (globalBtn) globalBtn.disabled = true;
+  if (globalSpinner) globalSpinner.style.display = 'inline-block';
+  if (globalBtnText) globalBtnText.textContent = scope ? 'Running Scope...' : 'Running All...';
+
+  document.querySelectorAll('.btn-run-single-test').forEach(btn => {
+    btn.disabled = true;
+    if (scope && btn.dataset.scope === scope) {
+      btn.classList.add('running-single');
+    }
+  });
+
+  try {
+    const response = await fetch('/api/docs/tests/run', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ scope })
+    });
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    renderTestResults(data);
+  } catch (error) {
+    console.error('Failed to run test suite:', error);
+    alert('Failed to execute test suite.');
+  } finally {
+    if (globalBtn) globalBtn.disabled = false;
+    if (globalSpinner) globalSpinner.style.display = 'none';
+    if (globalBtnText) globalBtnText.textContent = 'Run All Tests';
+    
+    document.querySelectorAll('.btn-run-single-test').forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('running-single');
+    });
+  }
+}
+
+function renderTestResults(data) {
+  const total = data.stats.total || 0;
+  const passed = data.stats.passed || 0;
+  const failed = data.stats.failed || 0;
+  const duration = data.duration || 0.00;
+  const successRate = data.stats.success_rate || 0;
+
+  const totalEl = document.getElementById('tests-stat-total');
+  const passedEl = document.getElementById('tests-stat-passed');
+  const failedEl = document.getElementById('tests-stat-failed');
+  const durationEl = document.getElementById('tests-stat-duration');
+  const scoreTextEl = document.getElementById('tests-score-text');
+
+  if (totalEl) totalEl.textContent = total;
+  if (passedEl) passedEl.textContent = passed;
+  if (failedEl) failedEl.textContent = failed;
+  if (durationEl) durationEl.textContent = `${duration.toFixed(2)}s`;
+  if (scoreTextEl) scoreTextEl.textContent = `${successRate}%`;
+
+  const fillCircle = document.getElementById('tests-gauge-fill');
+  if (fillCircle) {
+    const circumference = 2 * Math.PI * 50;
+    const offset = circumference - (successRate / 100) * circumference;
+    fillCircle.style.strokeDashoffset = offset;
+    
+    if (successRate >= 90) {
+      fillCircle.style.stroke = 'var(--color-success)';
+    } else if (successRate >= 70) {
+      fillCircle.style.stroke = '#f59e0b';
+    } else {
+      fillCircle.style.stroke = 'var(--color-danger)';
+    }
+  }
+
+  const tbody = document.getElementById('tests-table-body');
+  if (!tbody) return;
+
+  if (!data.results || data.results.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 24px;">No test results available. Click Run All to execute tests.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  data.results.forEach((test, idx) => {
+    const tr = document.createElement('tr');
+    
+    let component = 'Models';
+    if (test.class.includes('Repository')) {
+      component = 'Repositories';
+    } else if (test.class.includes('Service')) {
+      component = 'Services';
+    }
+
+    const badgeClass = test.status === 'PASS' ? 'status-pass' : 'status-fail';
+    
+    let errorLogHTML = '';
+    if (test.status !== 'PASS') {
+      errorLogHTML = `
+        <div class="test-details-container" style="margin-top: 8px;">
+          <button class="btn-toggle-traceback" data-trace-id="trace-${idx}">Show Traceback Details</button>
+          <pre class="test-traceback-pane" id="trace-${idx}">${escapeHtml(test.message)}</pre>
+        </div>
+      `;
+    }
+
+    const caseScope = `${test.class}.${test.name}`;
+
+    tr.innerHTML = `
+      <td><span class="badge font-display" style="font-size: 10px; font-weight: 700;">${component}</span></td>
+      <td>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-weight: 600; font-family: var(--font-sans); color: var(--color-text-primary);">${test.name.replace(/_/g, ' ')}</span>
+          <span style="font-size: 11px; color: var(--color-text-muted);">${test.class}.${test.name}()</span>
+        </div>
+      </td>
+      <td>
+        <span class="test-status-badge ${badgeClass}">${test.status}</span>
+      </td>
+      <td>
+        <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-start;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="text-muted" style="font-size: 11px;">Duration: ${test.duration.toFixed(3)}s</span>
+            <button class="btn-run-single-test" data-scope="${caseScope}">
+              <span>▶</span> Run Case
+            </button>
+          </div>
+          ${errorLogHTML}
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('.btn-toggle-traceback').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const traceId = e.currentTarget.dataset.traceId;
+      const pane = document.getElementById(traceId);
+      if (pane) {
+        const isHidden = pane.style.display === 'none' || !pane.style.display;
+        pane.style.display = isHidden ? 'block' : 'none';
+        e.currentTarget.textContent = isHidden ? 'Hide Traceback Details' : 'Show Traceback Details';
+      }
+    });
+  });
+
+  tbody.querySelectorAll('.btn-run-single-test').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const scope = e.currentTarget.dataset.scope;
+      runTestSuite(scope);
+    });
+  });
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 async function fetchDocsCommits() {
@@ -1428,6 +1612,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     selectEl.addEventListener('change', (e) => {
       currentDocsCommit = e.target.value;
       loadDocsSubtab(currentDocsSubtab);
+    });
+  }
+
+  const runTestsBtn = document.getElementById('btn-run-tests');
+  if (runTestsBtn) {
+    runTestsBtn.addEventListener('click', () => {
+      runTestSuite();
     });
   }
 
