@@ -1,28 +1,33 @@
 import os
 import json
+from typing import Any, Dict, List, Optional
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from services import TaskService
 from doc_service import DocService, PythonCodeAnalyzer
 
-app = Flask(__name__)
+app: Flask = Flask(__name__)
 # Enable CORS for cross-origin local testing if needed
 CORS(app)
 
-DB_FILE = "db.json"
-SEED_FILE = "gemini-code-1780008469746.json"
+DB_FILE: str = "db.json"
+SEED_FILE: str = "gemini-code-1780008469746.json"
 
-task_service = TaskService(DB_FILE)
+task_service: TaskService = TaskService(DB_FILE)
 
 # Initialize DocService and register Python AST analyzer
-code_doc_service = DocService(os.path.dirname(os.path.abspath(__file__)))
+code_doc_service: DocService = DocService(os.path.dirname(os.path.abspath(__file__)))
 code_doc_service.register_analyzer(".py", PythonCodeAnalyzer)
-CODEBASE_FILES = ["models.py", "repositories.py", "services.py", "server.py", "doc_service.py"]
+CODEBASE_FILES: List[str] = ["models.py", "repositories.py", "services.py", "server.py", "doc_service.py"]
 
 # ==========================================
 # DATABASE INITIALIZATION
 # ==========================================
-def initialize_database():
+def initialize_database() -> None:
+    """
+    Initializes the database if db.json is missing or empty.
+    Creates a basic JSON structure with empty lists for tasks and history.
+    """
     if not os.path.exists(DB_FILE) or os.path.getsize(DB_FILE) == 0:
         print(f"[{DB_FILE}] not found or empty. Initializing empty database...")
         try:
@@ -37,19 +42,27 @@ def initialize_database():
 # ==========================================
 
 @app.route("/api/tasks", methods=["GET"])
-def get_tasks():
-    include_deleted = request.args.get("include_deleted", "false").lower() == "true"
+def get_tasks() -> Any:
+    """
+    Retrieves all active or archived tasks.
+    Supports a query parameter 'include_deleted' (default: false).
+    """
+    include_deleted: bool = request.args.get("include_deleted", "false").lower() == "true"
     try:
-        tasks = task_service.get_all_tasks(include_deleted)
+        tasks: List[Dict[str, Any]] = task_service.get_all_tasks(include_deleted)
         return jsonify(tasks), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/tasks/<task_id>", methods=["GET"])
-def get_task(task_id):
+def get_task(task_id: str) -> Any:
+    """
+    Retrieves a single task by its unique identifier.
+    Returns a 404 error if the task is not found.
+    """
     try:
-        task = task_service.get_task_by_id(task_id)
+        task: Optional[Dict[str, Any]] = task_service.get_task_by_id(task_id)
         if not task:
             return jsonify({"error": "Task not found"}), 404
         return jsonify(task), 200
@@ -58,26 +71,34 @@ def get_task(task_id):
 
 
 @app.route("/api/tasks", methods=["POST"])
-def create_task():
+def create_task() -> Any:
+    """
+    Creates a new task.
+    Requires 'title' in the JSON body request payload.
+    """
     try:
-        task_data = request.json
+        task_data: Optional[Dict[str, Any]] = request.json
         if not task_data or not task_data.get("title"):
             return jsonify({"error": "Missing required field: title"}), 400
             
-        created = task_service.create_task(task_data)
+        created: Dict[str, Any] = task_service.create_task(task_data)
         return jsonify(created), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/tasks/<task_id>", methods=["PUT"])
-def update_task(task_id):
+def update_task(task_id: str) -> Any:
+    """
+    Updates properties of an existing task.
+    Requires a JSON body containing fields to be updated.
+    """
     try:
-        update_data = request.json
+        update_data: Optional[Dict[str, Any]] = request.json
         if not update_data:
             return jsonify({"error": "No update fields provided"}), 400
             
-        updated = task_service.update_task(task_id, update_data)
+        updated: Dict[str, Any] = task_service.update_task(task_id, update_data)
         return jsonify(updated), 200
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
@@ -86,9 +107,12 @@ def update_task(task_id):
 
 
 @app.route("/api/tasks/<task_id>", methods=["DELETE"])
-def delete_task(task_id):
+def delete_task(task_id: str) -> Any:
+    """
+    Soft-deletes a task by setting its 'is_deleted' flag to True.
+    """
     try:
-        deleted = task_service.delete_task(task_id)
+        deleted: Dict[str, Any] = task_service.delete_task(task_id)
         return jsonify(deleted), 200
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
@@ -97,9 +121,12 @@ def delete_task(task_id):
 
 
 @app.route("/api/tasks/<task_id>/restore", methods=["POST"])
-def restore_task(task_id):
+def restore_task(task_id: str) -> Any:
+    """
+    Restores a soft-deleted task, setting its 'is_deleted' flag back to False.
+    """
     try:
-        restored = task_service.restore_task(task_id)
+        restored: Dict[str, Any] = task_service.restore_task(task_id)
         return jsonify(restored), 200
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
@@ -108,16 +135,22 @@ def restore_task(task_id):
 
 
 @app.route("/api/tasks/<task_id>/history", methods=["GET"])
-def get_task_history(task_id):
+def get_task_history(task_id: str) -> Any:
+    """
+    Retrieves the chronological audit log for a task (newest first).
+    """
     try:
-        history = task_service.get_task_history(task_id)
+        history: List[Dict[str, Any]] = task_service.get_task_history(task_id)
         return jsonify(history), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/reset", methods=["POST"])
-def reset_database():
+def reset_database() -> Any:
+    """
+    Resets the database by clearing all tasks and audit history logs.
+    """
     try:
         task_service.reset_database()
         return jsonify({"message": "Database reset completed"}), 200
@@ -130,10 +163,13 @@ def reset_database():
 # ==========================================
 
 @app.route("/api/docs/metadata", methods=["GET"])
-def get_docs_metadata():
+def get_docs_metadata() -> Any:
+    """
+    Retrieves high-level metadata (classes, methods, file stats) for codebase files.
+    """
     try:
-        report = code_doc_service.analyze_project(CODEBASE_FILES)
-        metadata = {
+        report: Dict[str, Any] = code_doc_service.analyze_project(CODEBASE_FILES)
+        metadata: Dict[str, Any] = {
             "files": [
                 {
                     "file_name": f["metadata"]["file_name"],
@@ -149,10 +185,13 @@ def get_docs_metadata():
 
 
 @app.route("/api/docs/health", methods=["GET"])
-def get_docs_health():
+def get_docs_health() -> Any:
+    """
+    Retrieves static analysis code health report details (score, stats, active warnings).
+    """
     try:
-        report = code_doc_service.analyze_project(CODEBASE_FILES)
-        health = {
+        report: Dict[str, Any] = code_doc_service.analyze_project(CODEBASE_FILES)
+        health: Dict[str, Any] = {
             "score": report["score"],
             "files_scanned": report["files_scanned"],
             "stats": report["stats"],
@@ -164,15 +203,21 @@ def get_docs_health():
 
 
 @app.route("/api/docs/guides", methods=["GET"])
-def get_guides_list():
-    guides = ["architecture", "database", "time_travel"]
+def get_guides_list() -> Any:
+    """
+    Retrieves a list of available system documentation markdown guides.
+    """
+    guides: List[str] = ["architecture", "database", "time_travel"]
     return jsonify(guides), 200
 
 
 @app.route("/api/docs/guides/<name>", methods=["GET"])
-def get_guide(name):
+def get_guide(name: str) -> Any:
+    """
+    Retrieves content of a specific system guide by name.
+    """
     try:
-        content = code_doc_service.get_markdown_guide(name)
+        content: str = code_doc_service.get_markdown_guide(name)
         if not content:
             return jsonify({"error": "Guide not found"}), 404
         return jsonify({"name": name, "content": content}), 200
@@ -181,9 +226,12 @@ def get_guide(name):
 
 
 @app.route("/api/tasks/<task_id>/history/<history_id>", methods=["GET"])
-def get_task_reconstructed_state(task_id, history_id):
+def get_task_reconstructed_state(task_id: str, history_id: str) -> Any:
+    """
+    Retrieves a reconstructed task state at the moment after a specified history event.
+    """
     try:
-        data = task_service.get_reconstructed_task(task_id, history_id)
+        data: Dict[str, Any] = task_service.get_reconstructed_task(task_id, history_id)
         return jsonify(data), 200
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404
@@ -192,9 +240,12 @@ def get_task_reconstructed_state(task_id, history_id):
 
 
 @app.route("/api/tasks/<task_id>/rollback/<history_id>", methods=["POST"])
-def rollback_task_to_state(task_id, history_id):
+def rollback_task_to_state(task_id: str, history_id: str) -> Any:
+    """
+    Rolls back a task state to the moment after the specified history event.
+    """
     try:
-        updated_task = task_service.rollback_task(task_id, history_id)
+        updated_task: Dict[str, Any] = task_service.rollback_task(task_id, history_id)
         return jsonify(updated_task), 200
     except ValueError as ve:
         return jsonify({"error": str(ve)}), 404

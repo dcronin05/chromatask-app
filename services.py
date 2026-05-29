@@ -1,4 +1,5 @@
 import datetime
+from typing import Any, Dict, List, Optional
 from repositories import DatabaseContext
 from models import Task, HistoryLog
 
@@ -7,24 +8,27 @@ class TaskService:
     Service layer containing the business logic for task management.
     Coordinates between repositories and handles history tracking.
     """
-    def __init__(self, db_file_path="db.json"):
-        self.db_file_path = db_file_path
+    def __init__(self, db_file_path: str = "db.json") -> None:
+        """
+        Initializes the TaskService with a database file path.
+        """
+        self.db_file_path: str = db_file_path
 
-    def get_all_tasks(self, include_deleted=False):
-        """Retrieves all active or archived tasks."""
+    def get_all_tasks(self, include_deleted: bool = False) -> List[Dict[str, Any]]:
+        """Retrieves all active or archived tasks, sorted by creation date."""
         with DatabaseContext(self.db_file_path) as db:
             tasks = db.tasks.get_all(include_deleted)
             # Sort by creation time (newest first)
             tasks.sort(key=lambda t: t.created_at, reverse=True)
             return [t.to_dict() for t in tasks]
 
-    def get_task_by_id(self, task_id):
+    def get_task_by_id(self, task_id: str) -> Optional[Dict[str, Any]]:
         """Retrieves a single task by ID."""
         with DatabaseContext(self.db_file_path) as db:
             task = db.tasks.get(task_id)
             return task.to_dict() if task else None
 
-    def create_task(self, task_data):
+    def create_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
         """Creates a new task and logs the creation event."""
         with DatabaseContext(self.db_file_path) as db:
             # Instantiate Entity
@@ -43,7 +47,7 @@ class TaskService:
             
             return task.to_dict()
 
-    def update_task(self, task_id, update_data):
+    def update_task(self, task_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
         """Updates a task, diffs fields, and logs a detailed update history event."""
         with DatabaseContext(self.db_file_path) as db:
             task = db.tasks.get(task_id)
@@ -67,7 +71,7 @@ class TaskService:
                 
             return task.to_dict()
 
-    def delete_task(self, task_id):
+    def delete_task(self, task_id: str) -> Dict[str, Any]:
         """Soft-deletes a task and logs the deletion event."""
         with DatabaseContext(self.db_file_path) as db:
             task = db.tasks.get(task_id)
@@ -86,7 +90,7 @@ class TaskService:
             
             return task.to_dict()
 
-    def restore_task(self, task_id):
+    def restore_task(self, task_id: str) -> Dict[str, Any]:
         """Restores a soft-deleted task and logs the restoration event."""
         with DatabaseContext(self.db_file_path) as db:
             task = db.tasks.get(task_id)
@@ -105,7 +109,7 @@ class TaskService:
             
             return task.to_dict()
 
-    def get_task_history(self, task_id):
+    def get_task_history(self, task_id: str) -> List[Dict[str, Any]]:
         """Retrieves audit log events for a task (newest first)."""
         with DatabaseContext(self.db_file_path) as db:
             logs = db.history.get_all(task_id=task_id)
@@ -113,7 +117,7 @@ class TaskService:
             logs.sort(key=lambda l: l.timestamp, reverse=True)
             return [l.to_dict() for l in logs]
 
-    def _reconstruct_task_dict_at(self, task_id, history_id, db):
+    def _reconstruct_task_dict_at(self, task_id: str, history_id: str, db: DatabaseContext) -> Dict[str, Any]:
         """
         Reconstructs the task dictionary state immediately after a history event.
         Walks backward through history in reverse chronological order from current state.
@@ -151,7 +155,7 @@ class TaskService:
 
         return reconstructed
 
-    def get_reconstructed_task(self, task_id, history_id):
+    def get_reconstructed_task(self, task_id: str, history_id: str) -> Dict[str, Any]:
         """
         Retrieves a reconstructed task state at the moment after the specified history event.
         Returns a dict with reconstructed task state and the history log info.
@@ -167,7 +171,7 @@ class TaskService:
                 "log": log.to_dict()
             }
 
-    def rollback_task(self, task_id, history_id):
+    def rollback_task(self, task_id: str, history_id: str) -> Dict[str, Any]:
         """
         Rolls back a task to its state immediately after the specified history event.
         Calculates differences and logs a ROLLBACK audit event.
@@ -198,7 +202,7 @@ class TaskService:
 
             return task.to_dict()
 
-    def reset_database(self):
+    def reset_database(self) -> bool:
         """Resets the database, clearing all tasks and history."""
         with DatabaseContext(self.db_file_path) as db:
             # Clear all current memory records
