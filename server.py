@@ -180,6 +180,28 @@ def get_guide(name):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/tasks/<task_id>/history/<history_id>", methods=["GET"])
+def get_task_reconstructed_state(task_id, history_id):
+    try:
+        data = task_service.get_reconstructed_task(task_id, history_id)
+        return jsonify(data), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/tasks/<task_id>/rollback/<history_id>", methods=["POST"])
+def rollback_task_to_state(task_id, history_id):
+    try:
+        updated_task = task_service.rollback_task(task_id, history_id)
+        return jsonify(updated_task), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     initialize_database()
     # Run server locally on port 5000

@@ -543,8 +543,8 @@ async function renderDetailHistoryTimeline(taskId) {
       actionText = 'Task Deleted (Archived)';
     } else if (log.action === 'RESTORED') {
       actionText = 'Task Restored';
-    } else if (log.action === 'UPDATED') {
-      actionText = 'Task Updated';
+    } else if (log.action === 'UPDATED' || log.action === 'ROLLBACK') {
+      actionText = log.action === 'ROLLBACK' ? 'Task Rolled Back' : 'Task Updated';
       
       const changes = log.details.changes || [];
       if (changes.length > 0) {
@@ -570,6 +570,13 @@ async function renderDetailHistoryTimeline(taskId) {
               `;
             }).join('')}
           </ul>
+          <button class="timeline-diff-toggle" data-history-id="${log.history_id}">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="transition: transform var(--transition-fast);">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+            <span>Show Highlighted Diff</span>
+          </button>
+          ${formatInlineDiff(changes)}
         `;
       }
     }
@@ -577,11 +584,23 @@ async function renderDetailHistoryTimeline(taskId) {
     const logTime = new Date(log.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     const logDate = new Date(log.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
+    const timeTravelBtn = `
+      <button class="btn-time-travel" data-history-id="${log.history_id}" title="Inspect state at this version">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </button>
+    `;
+
     item.innerHTML = `
       <div class="timeline-bullet"></div>
       <div class="timeline-content">
-        <div class="timeline-header">
-          <span class="timeline-action">${actionText}</span>
+        <div class="timeline-header" style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="timeline-action">${actionText}</span>
+            ${timeTravelBtn}
+          </div>
           <span class="timeline-time">${logDate} ${logTime}</span>
         </div>
         ${detailsHTML}
@@ -589,6 +608,36 @@ async function renderDetailHistoryTimeline(taskId) {
     `;
 
     container.appendChild(item);
+  });
+
+  // Bind toggle diff buttons
+  container.querySelectorAll('.timeline-diff-toggle').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const pane = e.currentTarget.nextElementSibling;
+      if (pane && pane.classList.contains('timeline-diff-pane')) {
+        const isCollapsed = pane.style.display === 'none' || !pane.style.display;
+        pane.style.display = isCollapsed ? 'flex' : 'none';
+        
+        // Toggle text and SVG arrow orientation
+        const btnText = btn.querySelector('span');
+        const btnSvg = btn.querySelector('svg');
+        if (isCollapsed) {
+          btnText.textContent = 'Hide Highlighted Diff';
+          btnSvg.style.transform = 'rotate(180deg)';
+        } else {
+          btnText.textContent = 'Show Highlighted Diff';
+          btnSvg.style.transform = 'rotate(0deg)';
+        }
+      }
+    });
+  });
+
+  // Bind time-travel inspect buttons
+  container.querySelectorAll('.btn-time-travel').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const historyId = e.currentTarget.dataset.historyId;
+      openTimeTravelModal(taskId, historyId);
+    });
   });
 }
 
@@ -1036,6 +1085,270 @@ function showToast(message) {
 }
 
 // ==========================================
+// MODAL UTILITIES (RESTORED)
+// ==========================================
+function openModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.add('open');
+}
+
+function closeModal(id) {
+  const modal = document.getElementById(id);
+  if (modal) modal.classList.remove('open');
+}
+
+// ==========================================
+// TIME-TRAVEL & SIDE-BY-SIDE DIFF LOGIC
+// ==========================================
+function formatInlineDiff(changes) {
+  if (!changes || changes.length === 0) return '';
+  
+  let html = `<div class="timeline-diff-pane">`;
+  
+  changes.forEach(c => {
+    let oldVal = c.old;
+    let newVal = c.new;
+    
+    if (Array.isArray(oldVal) || Array.isArray(newVal)) {
+      const oldArr = Array.isArray(oldVal) ? oldVal : [];
+      const newArr = Array.isArray(newVal) ? newVal : [];
+      
+      const removed = oldArr.filter(x => !newArr.includes(x));
+      const added = newArr.filter(x => !oldArr.includes(x));
+      const unchanged = oldArr.filter(x => newArr.includes(x));
+      
+      let diffHtml = '';
+      removed.forEach(r => {
+        diffHtml += `<span class="diff-val-box diff-deleted">#${r}</span> `;
+      });
+      added.forEach(a => {
+        diffHtml += `<span class="diff-val-box diff-added">#${a}</span> `;
+      });
+      unchanged.forEach(u => {
+        diffHtml += `<span class="diff-val-box diff-unchanged">#${u}</span> `;
+      });
+      
+      html += `
+        <div class="timeline-diff-row">
+          <span class="timeline-diff-field">${c.field.replace(/_/g, ' ')}</span>
+          <span class="timeline-diff-vals">${diffHtml || 'None'}</span>
+        </div>
+      `;
+    } else if (c.field === 'collaborators') {
+      const oldNames = (oldVal || []).map(col => `${col.name} (${col.role})`);
+      const newNames = (newVal || []).map(col => `${col.name} (${col.role})`);
+      
+      const removed = oldNames.filter(x => !newNames.includes(x));
+      const added = newNames.filter(x => !oldNames.includes(x));
+      const unchanged = oldNames.filter(x => newNames.includes(x));
+      
+      let diffHtml = '';
+      removed.forEach(r => {
+        diffHtml += `<span class="diff-val-box diff-deleted">${r}</span> `;
+      });
+      added.forEach(a => {
+        diffHtml += `<span class="diff-val-box diff-added">${a}</span> `;
+      });
+      unchanged.forEach(u => {
+        diffHtml += `<span class="diff-val-box diff-unchanged">${u}</span> `;
+      });
+      
+      html += `
+        <div class="timeline-diff-row">
+          <span class="timeline-diff-field">collaborators</span>
+          <span class="timeline-diff-vals">${diffHtml || 'None'}</span>
+        </div>
+      `;
+    } else if (c.field === 'curated_video_bookmarks') {
+      const oldBms = (oldVal || []).map(b => `${b.timestamp} - ${b.label}`);
+      const newBms = (newVal || []).map(b => `${b.timestamp} - ${b.label}`);
+      
+      const removed = oldBms.filter(x => !newBms.includes(x));
+      const added = newBms.filter(x => !oldBms.includes(x));
+      
+      let diffHtml = '';
+      removed.forEach(r => {
+        diffHtml += `<span class="diff-val-box diff-deleted">${r}</span> `;
+      });
+      added.forEach(a => {
+        diffHtml += `<span class="diff-val-box diff-added">${a}</span> `;
+      });
+      
+      html += `
+        <div class="timeline-diff-row">
+          <span class="timeline-diff-field">video bookmarks</span>
+          <span class="timeline-diff-vals">${diffHtml || 'No changes'}</span>
+        </div>
+      `;
+    } else {
+      let displayOld = oldVal === null ? 'None' : oldVal;
+      let displayNew = newVal === null ? 'None' : newVal;
+      
+      if (c.field === 'due_date') {
+        displayOld = oldVal ? formatDate(oldVal) : 'None';
+        displayNew = newVal ? formatDate(newVal) : 'None';
+      }
+      
+      html += `
+        <div class="timeline-diff-row">
+          <span class="timeline-diff-field">${c.field.replace(/_/g, ' ')}</span>
+          <span class="timeline-diff-vals">
+            <span class="diff-val-box diff-deleted">${displayOld}</span>
+            <span class="timeline-diff-arrow">➜</span>
+            <span class="diff-val-box diff-added">${displayNew}</span>
+          </span>
+        </div>
+      `;
+    }
+  });
+  
+  html += `</div>`;
+  return html;
+}
+
+async function openTimeTravelModal(taskId, historyId) {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}/history/${historyId}`);
+    if (!response.ok) throw new Error('Failed to fetch reconstructed task state');
+    const data = await response.json();
+
+    const reconstructed = data.reconstructed;
+    const log = data.log;
+    const current = tasks.find(t => t.task_id === taskId);
+    
+    if (!current) throw new Error('Current live task state not found');
+
+    // 1. Update Subtitle
+    const logTime = new Date(log.timestamp).toLocaleString();
+    document.getElementById('time-travel-subtitle').textContent = 
+      `Comparing version after event [${log.action}] at ${logTime} with current live task state.`;
+
+    // 2. Render side-by-side diff
+    const container = document.getElementById('time-travel-diff-body');
+    container.innerHTML = '';
+
+    // Define trackable keys to display
+    const fieldsToInspect = [
+      { key: 'title', label: 'Title', type: 'text' },
+      { key: 'description', label: 'Description', type: 'text' },
+      { key: 'status', label: 'Status', type: 'badge' },
+      { key: 'priority', label: 'Priority', type: 'priority' },
+      { key: 'due_date', label: 'Due Date', type: 'date' },
+      { key: 'task_specific_tags', label: 'Tags', type: 'tags' },
+      { key: 'collaborators', label: 'Collaborators', type: 'collaborators' },
+      { key: 'curated_video_bookmarks', label: 'Video Bookmarks', type: 'bookmarks' }
+    ];
+
+    // Build left & right columns
+    const leftCol = document.createElement('div');
+    leftCol.className = 'diff-column old';
+    leftCol.innerHTML = `<h3>Historical State (${log.action})</h3>`;
+
+    const rightCol = document.createElement('div');
+    rightCol.className = 'diff-column new';
+    rightCol.innerHTML = `<h3>Current Live State</h3>`;
+
+    fieldsToInspect.forEach(f => {
+      const valOld = reconstructed[f.key];
+      const valNew = current[f.key];
+
+      let isChanged = false;
+      // Equivalence checking
+      if (Array.isArray(valOld) || Array.isArray(valNew)) {
+        isChanged = JSON.stringify(valOld) !== JSON.stringify(valNew);
+      } else if (f.key === 'due_date' && valOld && valNew) {
+        isChanged = valOld.slice(0, 16) !== valNew.slice(0, 16);
+      } else {
+        isChanged = valOld !== valNew;
+      }
+
+      const cardClass = `diff-field-card ${isChanged ? 'changed' : ''}`;
+
+      // Format representations
+      let reprOld = '';
+      let reprNew = '';
+
+      if (f.type === 'text') {
+        reprOld = valOld || '<em class="text-muted">Empty</em>';
+        reprNew = valNew || '<em class="text-muted">Empty</em>';
+      } else if (f.type === 'badge') {
+        reprOld = `<span class="badge" style="background: rgba(255,255,255,0.05);">${valOld}</span>`;
+        reprNew = `<span class="badge" style="background: rgba(255,255,255,0.05);">${valNew}</span>`;
+      } else if (f.type === 'priority') {
+        reprOld = `<span class="badge badge-priority-${valOld}">${valOld}</span>`;
+        reprNew = `<span class="badge badge-priority-${valNew}">${valNew}</span>`;
+      } else if (f.type === 'date') {
+        reprOld = valOld ? formatDate(valOld) : '<em class="text-muted">None</em>';
+        reprNew = valNew ? formatDate(valNew) : '<em class="text-muted">None</em>';
+      } else if (f.type === 'tags') {
+        const oldTags = valOld || [];
+        const newTags = valNew || [];
+        reprOld = oldTags.map(t => `<span class="detail-tag-badge">#${t}</span>`).join(' ') || '<em class="text-muted">None</em>';
+        reprNew = newTags.map(t => `<span class="detail-tag-badge">#${t}</span>`).join(' ') || '<em class="text-muted">None</em>';
+      } else if (f.type === 'collaborators') {
+        const oldCols = valOld || [];
+        const newCols = valNew || [];
+        reprOld = oldCols.map(c => `<span class="badge" style="background: rgba(255,255,255,0.03); margin-bottom: 2px;">${c.name} (${c.role})</span>`).join('<br>') || '<em class="text-muted">None</em>';
+        reprNew = newCols.map(c => `<span class="badge" style="background: rgba(255,255,255,0.03); margin-bottom: 2px;">${c.name} (${c.role})</span>`).join('<br>') || '<em class="text-muted">None</em>';
+      } else if (f.type === 'bookmarks') {
+        const oldBms = valOld || [];
+        const newBms = valNew || [];
+        reprOld = oldBms.map(b => `<span style="font-size:11px;"><code>${b.timestamp}</code> ${b.label}</span>`).join('<br>') || '<em class="text-muted">None</em>';
+        reprNew = newBms.map(b => `<span style="font-size:11px;"><code>${b.timestamp}</code> ${b.label}</span>`).join('<br>') || '<em class="text-muted">None</em>';
+      }
+
+      // Add diff styling highlight classes if changed
+      const valClassOld = isChanged ? 'diff-val-box diff-deleted' : 'diff-val-box diff-unchanged';
+      const valClassNew = isChanged ? 'diff-val-box diff-added' : 'diff-val-box diff-unchanged';
+
+      leftCol.innerHTML += `
+        <div class="${cardClass}">
+          <span class="diff-field-lbl">${f.label}</span>
+          <div class="${valClassOld}">${reprOld}</div>
+        </div>
+      `;
+
+      rightCol.innerHTML += `
+        <div class="${cardClass}">
+          <span class="diff-field-lbl">${f.label}</span>
+          <div class="${valClassNew}">${reprNew}</div>
+        </div>
+      `;
+    });
+
+    container.appendChild(leftCol);
+    container.appendChild(rightCol);
+
+    // 3. Bind Rollback Button with these parameters
+    const rollbackBtn = document.getElementById('time-travel-rollback-btn');
+    const newRollbackBtn = rollbackBtn.cloneNode(true);
+    rollbackBtn.parentNode.replaceChild(newRollbackBtn, rollbackBtn);
+    
+    newRollbackBtn.addEventListener('click', async () => {
+      if (confirm(`Are you sure you want to rollback this task to the state of ${logTime}? This will record a new ROLLBACK event.`)) {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}/rollback/${historyId}`, { method: 'POST' });
+          if (!res.ok) throw new Error('Rollback failed on server');
+          showToast('Task successfully rolled back!');
+          closeModal('time-travel-modal');
+          await fetchTasks();
+          renderView();
+          openDetailDrawer(taskId);
+        } catch (err) {
+          console.error(err);
+          showToast('Error performing rollback.');
+        }
+      }
+    });
+
+    openModal('time-travel-modal');
+  } catch (err) {
+    console.error(err);
+    showToast('Failed to open Time-Travel inspector.');
+  }
+}
+
+// ==========================================
 // 8. EVENT BINDINGS
 // ==========================================
 
@@ -1235,6 +1548,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('btn-add-bookmark').addEventListener('click', () => openModal('bookmark-modal'));
   document.getElementById('bookmark-close-btn').addEventListener('click', () => closeModal('bookmark-modal'));
   document.getElementById('bookmark-cancel-btn').addEventListener('click', () => closeModal('bookmark-modal'));
+
+  // Time Travel Modal
+  document.getElementById('time-travel-close-btn').addEventListener('click', () => closeModal('time-travel-modal'));
+  document.getElementById('time-travel-cancel-btn').addEventListener('click', () => closeModal('time-travel-modal'));
 
   document.getElementById('bookmarks-list-container').addEventListener('click', (e) => {
     const btn = e.target.closest('.btn-delete-bookmark');

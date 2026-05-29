@@ -1925,3 +1925,162 @@ body {
   background: var(--border-light);
   margin: 24px 0;
 }
+
+/* ==========================================
+   9. TIME-TRAVEL & VISUAL DIFF INSPECTOR
+   ========================================== */
+
+.diff-split-container {
+  display: flex;
+  gap: 16px;
+  margin: 16px 0;
+  width: 100%;
+}
+
+.diff-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px;
+  border-radius: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.diff-column h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+}
+
+.diff-field-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  transition: all var(--transition-fast);
+}
+
+.diff-field-card.changed {
+  border-color: rgba(251, 191, 36, 0.2);
+  background: rgba(251, 191, 36, 0.02);
+}
+
+.diff-field-lbl {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diff-val-box {
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.diff-deleted {
+  background-color: rgba(244, 63, 94, 0.12);
+  color: #f43f5e;
+  text-decoration: line-through;
+  border-left: 2px solid #f43f5e;
+}
+
+.diff-added {
+  background-color: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-left: 2px solid #10b981;
+}
+
+.diff-unchanged {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+/* Timeline Inline Diff styles */
+.timeline-diff-toggle {
+  background: none;
+  border: none;
+  color: #c084fc;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: color var(--transition-fast);
+}
+
+.timeline-diff-toggle:hover {
+  color: #a855f7;
+}
+
+.timeline-diff-pane {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 6px;
+  font-size: 11px;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  animation: fadeIn var(--transition-fast);
+}
+
+.timeline-diff-row {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.timeline-diff-field {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: capitalize;
+}
+
+.timeline-diff-vals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.timeline-diff-arrow {
+  color: var(--color-text-muted);
+}
+
+/* Time Travel Button in Timeline */
+.btn-time-travel {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.btn-time-travel:hover {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+}

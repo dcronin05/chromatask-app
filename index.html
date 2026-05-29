@@ -497,6 +497,33 @@
         </div>
       </div>
 
+      <!-- Time Travel Version & Diff Modal -->
+      <div class="modal-overlay" id="time-travel-modal">
+        <div class="modal-box modal-lg" style="max-width: 900px; width: 90%;">
+          <div class="modal-header">
+            <div>
+              <h2 class="modal-title">Time Travel: Version Inspector</h2>
+              <p class="modal-subtitle" id="time-travel-subtitle" style="font-size: 12px; color: var(--color-text-muted); margin-top: 4px;"></p>
+            </div>
+            <button class="modal-close-btn" id="time-travel-close-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="diff-split-container" id="time-travel-diff-body" style="display: flex; gap: 16px; margin: 16px 0; overflow-y: auto; max-height: 60vh;">
+            <!-- Render split-diff content dynamically -->
+          </div>
+          <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+            <span style="font-size: 11px; color: var(--color-text-muted); font-style: italic;">
+              * Note: Rolling back will restore this version and log a new ROLLBACK event.
+            </span>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" class="btn btn-secondary" id="time-travel-cancel-btn">Close</button>
+              <button type="button" class="btn btn-primary" id="time-travel-rollback-btn">Rollback to this Version</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <!-- YouTube IFrame Player API -->
