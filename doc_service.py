@@ -417,7 +417,12 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
         scope = f"Function {func_name}"
         line_no = i + 1
 
-        # Check Naming
+        self._check_naming(func_name, line_no, scope, warnings)
+        self._check_jsdoc(lines, i, line_no, scope, func_name, warnings)
+        self._check_length(lines, i, line_no, scope, func_name, warnings)
+
+    def _check_naming(self, func_name: str, line_no: int, scope: str, warnings: List[Dict[str, Any]]) -> None:
+        """Checks naming convention rules for constructor classes or regular camelCase functions."""
         if func_name[0].isupper():
             if not re.match(r"^[A-Z][a-zA-Z0-9]*$", func_name):
                 warnings.append({
@@ -431,7 +436,8 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
                     "issue": f"Function '{func_name}' should use camelCase naming convention."
                 })
 
-        # Check JSDoc
+    def _check_jsdoc(self, lines: List[str], i: int, line_no: int, scope: str, func_name: str, warnings: List[Dict[str, Any]]) -> None:
+        """Checks JSDoc descriptions on function signatures."""
         has_jsdoc = False
         for j in range(max(0, i - 5), i):
             prev = lines[j].strip()
@@ -444,7 +450,8 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
                 "issue": f"Function '{func_name}' is missing descriptive comments."
             })
 
-        # Check Length
+    def _check_length(self, lines: List[str], i: int, line_no: int, scope: str, func_name: str, warnings: List[Dict[str, Any]]) -> None:
+        """Validates function code line lengths do not exceed limit."""
         func_lines = 0
         brace_count = 0
         started = False
