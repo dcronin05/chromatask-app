@@ -1408,12 +1408,49 @@ body {
   animation: fadeIn var(--transition-fast) ease-out;
 }
 
-.docs-subnav {
+.docs-header-bar {
   display: flex;
-  gap: 8px;
+  justify-content: space-between;
+  align-items: center;
   border-bottom: 1px solid var(--border-light);
   padding-bottom: 12px;
   margin-bottom: 8px;
+}
+
+.docs-subnav {
+  display: flex;
+  gap: 8px;
+}
+
+.version-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 14px;
+}
+
+.version-selector-container label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.docs-version-select {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: var(--transition-fast);
+}
+
+.docs-version-select:hover, .docs-version-select:focus {
+  border-color: #38bdf8;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .docs-subnav-btn {
