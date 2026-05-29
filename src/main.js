@@ -22,54 +22,308 @@ const TASK_DISPLAY_CONFIG = [
   {
     key: 'title',
     label: 'Title',
+    placement: 'header',
     render: (val) => val || '<em class="text-muted">Empty</em>',
-    equals: (a, b) => a === b
+    equals: (a, b) => a === b,
+    renderCard: (val, task) => `<h3 class="card-title">${val || 'Untitled'}</h3>`,
+    renderDetail: (val, onUpdate, task) => {
+      const el = document.createElement('h2');
+      el.className = 'detail-title';
+      el.id = 'detail-title';
+      el.setAttribute('contenteditable', 'true');
+      el.textContent = val || 'Untitled';
+      el.addEventListener('blur', (e) => onUpdate('title', e.target.textContent));
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.target.blur();
+        }
+      });
+      return el;
+    }
   },
   {
     key: 'description',
     label: 'Description',
+    placement: 'description',
     render: (val) => val || '<em class="text-muted">Empty</em>',
-    equals: (a, b) => a === b
+    equals: (a, b) => a === b,
+    renderCard: (val, task) => `<p class="card-desc">${val || 'No description provided.'}</p>`,
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'drawer-section';
+      wrapper.innerHTML = `
+        <h3 class="section-subtitle">Description</h3>
+        <textarea class="textarea-styled" id="detail-description" placeholder="Add a description..."></textarea>
+      `;
+      const ta = wrapper.querySelector('textarea');
+      ta.value = val || '';
+      ta.addEventListener('blur', (e) => onUpdate('description', e.target.value));
+      return wrapper;
+    }
   },
   {
     key: 'status',
     label: 'Status',
+    placement: 'none',
     render: (val) => `<span class="badge" style="background: rgba(255,255,255,0.05);">${val}</span>`,
-    equals: (a, b) => a === b
+    equals: (a, b) => a === b,
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'meta-item';
+      wrapper.innerHTML = `
+        <span class="meta-label">Status</span>
+        <select class="select-styled" id="detail-status-select">
+          <option value="TODO">To Do</option>
+          <option value="IN_PROGRESS">In Progress</option>
+          <option value="COMPLETED">Completed</option>
+        </select>
+      `;
+      const sel = wrapper.querySelector('select');
+      sel.value = val;
+      sel.addEventListener('change', (e) => onUpdate('status', e.target.value));
+      return wrapper;
+    }
   },
   {
     key: 'priority',
     label: 'Priority',
+    placement: 'badge',
     render: (val) => `<span class="badge badge-priority-${val}">${val}</span>`,
-    equals: (a, b) => a === b
+    equals: (a, b) => a === b,
+    renderCard: (val, task) => `<span class="badge badge-priority-${val}">${getPriorityLabel(val)}</span>`,
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'meta-item';
+      wrapper.innerHTML = `
+        <span class="meta-label">Priority</span>
+        <select class="select-styled" id="detail-priority-select">
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+        </select>
+      `;
+      const sel = wrapper.querySelector('select');
+      sel.value = val;
+      sel.addEventListener('change', (e) => onUpdate('priority', e.target.value));
+      return wrapper;
+    }
   },
   {
     key: 'due_date',
     label: 'Due Date',
+    placement: 'meta',
     render: (val) => val ? formatDate(val) : '<em class="text-muted">None</em>',
     equals: (a, b) => {
       if (!a && !b) return true;
       if (!a || !b) return false;
       return a.slice(0, 16) === b.slice(0, 16);
+    },
+    renderCard: (val, task) => {
+      if (!val) return '';
+      const isOver = isOverdue(val) && task.status !== 'COMPLETED';
+      return `
+        <div class="card-due ${isOver ? 'overdue' : ''}">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>${isOver ? 'Overdue: ' : ''}${formatDate(val)}</span>
+        </div>
+      `;
+    },
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'meta-item';
+      wrapper.innerHTML = `
+        <span class="meta-label">Due Date</span>
+        <input type="datetime-local" class="input-styled" id="detail-due-date" />
+      `;
+      const inp = wrapper.querySelector('input');
+      inp.value = val ? val.slice(0, 16) : '';
+      inp.addEventListener('change', (e) => onUpdate('due_date', e.target.value));
+      return wrapper;
     }
   },
   {
     key: 'task_specific_tags',
     label: 'Tags',
+    placement: 'none',
     render: (val) => (val || []).map(t => `<span class="detail-tag-badge">#${t}</span>`).join(' ') || '<em class="text-muted">None</em>',
-    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'drawer-section tags-section';
+      wrapper.innerHTML = `
+        <h3 class="section-subtitle">Tags</h3>
+        <div class="detail-tags-list" id="detail-tags-container"></div>
+        <div class="tag-input-row">
+          <input type="text" id="new-tag-input" placeholder="Add tag..." class="input-styled input-sm" />
+          <button class="btn btn-secondary btn-sm" id="btn-add-tag">Add</button>
+        </div>
+      `;
+      const container = wrapper.querySelector('#detail-tags-container');
+      const input = wrapper.querySelector('#new-tag-input');
+      const addBtn = wrapper.querySelector('#btn-add-tag');
+
+      const tags = val || [];
+      tags.forEach((tag, idx) => {
+        const badge = document.createElement('span');
+        badge.className = 'detail-tag-badge';
+        badge.innerHTML = `
+          <span>#${tag}</span>
+          <button class="btn-remove-tag" data-index="${idx}" aria-label="Delete tag">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        `;
+        badge.querySelector('.btn-remove-tag').addEventListener('click', () => {
+          const nextTags = [...tags];
+          nextTags.splice(idx, 1);
+          onUpdate('task_specific_tags', nextTags);
+        });
+        container.appendChild(badge);
+      });
+
+      addBtn.addEventListener('click', () => {
+        const tagVal = input.value.trim();
+        if (tagVal && !tags.includes(tagVal)) {
+          onUpdate('task_specific_tags', [...tags, tagVal]);
+        }
+      });
+      return wrapper;
+    }
   },
   {
     key: 'collaborators',
     label: 'Collaborators',
+    placement: 'meta',
     render: (val) => (val || []).map(c => `<span class="badge" style="background: rgba(255,255,255,0.03); margin-bottom: 2px;">${c.name} (${c.role})</span>`).join('<br>') || '<em class="text-muted">None</em>',
-    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    renderCard: (val, task) => {
+      if (!val || val.length === 0) return '';
+      return `
+        <div class="card-avatars">
+          ${val.map(c => {
+            const initials = c.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+            return `<div class="collab-avatar" title="${c.name} (${c.role}) - ${c.status}">${initials}</div>`;
+          }).join('')}
+        </div>
+      `;
+    },
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'drawer-section collaborators-section';
+      wrapper.innerHTML = `
+        <div class="section-header-row">
+          <h3 class="section-subtitle">Collaborators</h3>
+          <button class="btn-text" id="btn-add-collaborator" type="button">+ Invite</button>
+        </div>
+        <div class="collaborators-list" id="collaborators-list-container"></div>
+      `;
+      const container = wrapper.querySelector('#collaborators-list-container');
+      wrapper.querySelector('#btn-add-collaborator').addEventListener('click', () => openModal('collaborator-modal'));
+
+      const collabs = val || [];
+      if (collabs.length === 0) {
+        container.innerHTML = '<p class="text-muted" style="font-size:12px; font-style:italic;">No collaborators invited yet.</p>';
+      } else {
+        collabs.forEach((collab, idx) => {
+          const initials = collab.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+          const item = document.createElement('div');
+          item.className = 'collaborator-item';
+          item.innerHTML = `
+            <div class="collab-left">
+              <div class="collab-avatar-lg">${initials}</div>
+              <div class="collab-info">
+                <span class="collab-name">${collab.name}</span>
+                <span class="collab-role">${collab.role}</span>
+              </div>
+            </div>
+            <div class="collab-right">
+              <select class="collab-status-select">
+                <option value="INVITED" ${collab.status === 'INVITED' ? 'selected' : ''}>Invited</option>
+                <option value="JOINED" ${collab.status === 'JOINED' ? 'selected' : ''}>Joined</option>
+                <option value="DECLINED" ${collab.status === 'DECLINED' ? 'selected' : ''}>Declined</option>
+              </select>
+              <button class="btn-remove-collab" type="button">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+          `;
+          item.querySelector('.collab-status-select').addEventListener('change', (e) => {
+            const nextCollabs = JSON.parse(JSON.stringify(collabs));
+            nextCollabs[idx].status = e.target.value;
+            onUpdate('collaborators', nextCollabs);
+          });
+          item.querySelector('.btn-remove-collab').addEventListener('click', () => {
+            if (confirm('Remove this collaborator?')) {
+              const nextCollabs = [...collabs];
+              nextCollabs.splice(idx, 1);
+              onUpdate('collaborators', nextCollabs);
+            }
+          });
+          container.appendChild(item);
+        });
+      }
+      return wrapper;
+    }
   },
   {
     key: 'curated_video_bookmarks',
     label: 'Video Bookmarks',
+    placement: 'none',
     render: (val) => (val || []).map(b => `<span style="font-size:11px;"><code>${b.timestamp}</code> ${b.label}</span>`).join('<br>') || '<em class="text-muted">None</em>',
-    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+    renderDetail: (val, onUpdate, task) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'drawer-section bookmarks-section';
+      wrapper.innerHTML = `
+        <div class="section-header-row">
+          <h3 class="section-subtitle">Video Bookmarks</h3>
+          <button class="btn-text" id="btn-add-bookmark" type="button">+ Add Bookmark</button>
+        </div>
+        <p class="section-instructions">Click timestamps to jump to that moment in the video lecture.</p>
+        <div class="bookmarks-list" id="bookmarks-list-container"></div>
+      `;
+      const container = wrapper.querySelector('#bookmarks-list-container');
+      wrapper.querySelector('#btn-add-bookmark').addEventListener('click', () => openModal('bookmark-modal'));
+
+      const bms = val || [];
+      if (bms.length === 0) {
+        container.innerHTML = '<p class="text-muted" style="font-size: 12px; font-style: italic; padding: 8px 0;">No bookmarks set yet.</p>';
+      } else {
+        bms.forEach((bm, idx) => {
+          const item = document.createElement('div');
+          item.className = 'bookmark-item';
+          item.innerHTML = `
+            <span class="bookmark-time-badge">${bm.timestamp}</span>
+            <div class="bookmark-info">
+              <span class="bookmark-label">${bm.label}</span>
+              ${bm.note ? `<span class="bookmark-note">${bm.note}</span>` : ''}
+            </div>
+            <button class="btn-delete-bookmark" type="button">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            </button>
+          `;
+          item.querySelector('.btn-delete-bookmark').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (confirm('Delete this video bookmark?')) {
+              const nextBms = [...bms];
+              nextBms.splice(idx, 1);
+              onUpdate('curated_video_bookmarks', nextBms);
+            }
+          });
+          item.addEventListener('click', (e) => {
+            if (e.target.closest('.btn-delete-bookmark')) return;
+            const seconds = parseTimestamp(bm.timestamp);
+            if (ytPlayer && ytPlayerReady && typeof ytPlayer.seekTo === 'function') {
+              ytPlayer.seekTo(seconds, true);
+              try { ytPlayer.playVideo(); } catch(e) {}
+              showToast(`Seeking video to ${bm.timestamp}`);
+            }
+          });
+          container.appendChild(item);
+        });
+      }
+      return wrapper;
+    }
   }
 ];
 
@@ -77,11 +331,54 @@ const TASK_DISPLAY_CONFIG = [
 // 2. BACKEND API SYNCING
 // ==========================================
 
+function syncDynamicFields(taskObjects) {
+  const ignoredKeys = new Set([
+    'task_id', 'created_at', 'updated_at', 'is_deleted', 'deleted_at',
+    'attachment_type', 'media_metadata'
+  ]);
+
+  taskObjects.forEach(task => {
+    Object.keys(task).forEach(key => {
+      if (ignoredKeys.has(key)) return;
+      
+      // Check if key is already in display config
+      const exists = TASK_DISPLAY_CONFIG.some(c => c.key === key);
+      if (exists) return;
+
+      // Dynamically add a config entry
+      const label = key.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      TASK_DISPLAY_CONFIG.push({
+        key: key,
+        label: label,
+        placement: 'meta', // Default to metadata row on card
+        isDynamic: true,
+        render: (val) => val !== undefined && val !== null ? String(val) : '<em class="text-muted">Empty</em>',
+        equals: (a, b) => JSON.stringify(a) === JSON.stringify(b),
+        renderCard: (val) => val !== undefined && val !== null ? `<div class="card-meta-item"><span>${label}: ${val}</span></div>` : '',
+        renderDetail: (val, onUpdate) => {
+          const wrapper = document.createElement('div');
+          wrapper.className = 'meta-item dynamic-field-item';
+          wrapper.innerHTML = `
+            <span class="meta-label">${label}</span>
+            <input type="text" class="input-styled" value="${val !== undefined && val !== null ? val : ''}" placeholder="Set ${label.toLowerCase()}..." />
+          `;
+          const input = wrapper.querySelector('input');
+          input.addEventListener('blur', (e) => {
+            onUpdate(key, e.target.value.trim());
+          });
+          return wrapper;
+        }
+      });
+    });
+  });
+}
+
 async function fetchTasks() {
   try {
-    const response = await fetch('/api/tasks');
+    const response = await fetch('/api/tasks?include_deleted=true');
     if (!response.ok) throw new Error('Failed to fetch tasks');
     tasks = await response.json();
+    syncDynamicFields(tasks);
   } catch (error) {
     console.error('API Error:', error);
     showToast('Failed to load tasks from server.');
@@ -378,44 +675,44 @@ function createTaskCard(task) {
   card.setAttribute('id', `card-${task.task_id}`);
   card.dataset.id = task.task_id;
 
-  const priorityBadge = `<span class="badge badge-priority-${task.priority}">${getPriorityLabel(task.priority)}</span>`;
-  const coreBadge = task.is_core ? `<span class="badge badge-core">Seed Task</span>` : '';
+  let badgesHTML = '';
+  let metaHTML = '';
+  let headerHTML = '';
+  let descHTML = '';
 
-  let dueHTML = '';
-  if (task.due_date) {
-    const isOver = isOverdue(task.due_date) && task.status !== 'COMPLETED';
-    dueHTML = `
-      <div class="card-due ${isOver ? 'overdue' : ''}">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span>${isOver ? 'Overdue: ' : ''}${formatDate(task.due_date)}</span>
-      </div>
-    `;
+  if (task.is_core) {
+    badgesHTML += `<span class="badge badge-core">Seed Task</span>`;
   }
 
-  let collabHTML = '';
-  if (task.collaborators && task.collaborators.length > 0) {
-    collabHTML = `
-      <div class="card-avatars">
-        ${task.collaborators.map(c => {
-          const initials = c.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
-          return `<div class="collab-avatar" title="${c.name} (${c.role}) - ${c.status}">${initials}</div>`;
-        }).join('')}
-      </div>
-    `;
-  }
+  TASK_DISPLAY_CONFIG.forEach(f => {
+    const val = task[f.key];
+    if (f.placement === 'header') {
+      headerHTML += typeof f.renderCard === 'function' ? f.renderCard(val, task) : `<h3 class="card-title">${val || 'Untitled'}</h3>`;
+    } else if (f.placement === 'badge' && val) {
+      if (typeof f.renderCard === 'function') {
+        badgesHTML += f.renderCard(val, task);
+      }
+    } else if (f.placement === 'description') {
+      if (typeof f.renderCard === 'function') {
+        descHTML += f.renderCard(val, task);
+      }
+    } else if (f.placement === 'meta' && val) {
+      if (typeof f.renderCard === 'function') {
+        metaHTML += f.renderCard(val, task);
+      }
+    }
+  });
 
   card.innerHTML = `
     <div class="card-header">
-      <h3 class="card-title">${task.title}</h3>
+      ${headerHTML}
     </div>
     <div class="card-badges">
-      ${priorityBadge}
-      ${coreBadge}
+      ${badgesHTML}
     </div>
-    <p class="card-desc">${task.description || 'No description provided.'}</p>
+    ${descHTML}
     <div class="card-meta-row">
-      ${dueHTML}
-      ${collabHTML}
+      ${metaHTML}
     </div>
   `;
 
@@ -436,62 +733,88 @@ function createTaskCard(task) {
   return card;
 }
 
-async function renderArchive() {
+function renderArchive() {
   const tbody = document.getElementById('archive-table-body');
   if (!tbody) return;
-  tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 24px;">Loading archive records...</td></tr>';
 
-  try {
-    const response = await fetch('/api/tasks?include_deleted=true');
-    if (!response.ok) throw new Error();
-    const allTasks = await response.json();
-    const deletedTasks = allTasks.filter(t => t.is_deleted);
-
-    tbody.innerHTML = '';
-    
-    if (deletedTasks.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 32px; color: var(--color-text-muted);">No archived or deleted tasks found.</td></tr>';
-      document.getElementById('task-metrics-summary').textContent = '0 archived tasks';
-      return;
-    }
-
-    document.getElementById('task-metrics-summary').textContent = `${deletedTasks.length} archived tasks`;
-
-    deletedTasks.forEach(task => {
-      const tr = document.createElement('tr');
-      
-      const priorityLabel = getPriorityLabel(task.priority);
-      const deletedDate = formatDate(task.deleted_at || task.updated_at);
-      
-      tr.innerHTML = `
-        <td class="archive-title-cell">${task.title}</td>
-        <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--color-text-secondary);">${task.status}</span></td>
-        <td><span class="badge badge-priority-${task.priority}">${priorityLabel}</span></td>
-        <td>${deletedDate}</td>
-        <td class="archive-action-cell">
-          <button class="btn btn-secondary btn-sm btn-view-history" data-id="${task.task_id}">Timeline</button>
-          <button class="btn btn-primary btn-sm btn-restore-task" data-id="${task.task_id}">Restore</button>
-        </td>
-      `;
-
-      tr.querySelector('.btn-view-history').addEventListener('click', () => {
-        openDetailDrawer(task.task_id);
-      });
-      tr.querySelector('.btn-restore-task').addEventListener('click', () => {
-        apiRestoreTask(task.task_id);
-      });
-
-      tbody.appendChild(tr);
-    });
-  } catch (error) {
-    console.error(error);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load archive.</td></tr>';
+  const deletedTasks = tasks.filter(t => t.is_deleted);
+  tbody.innerHTML = '';
+  
+  if (deletedTasks.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 32px; color: var(--color-text-muted);">No archived or deleted tasks found.</td></tr>';
+    document.getElementById('task-metrics-summary').textContent = '0 archived tasks';
+    return;
   }
+
+  document.getElementById('task-metrics-summary').textContent = `${deletedTasks.length} archived tasks`;
+
+  deletedTasks.forEach(task => {
+    const tr = document.createElement('tr');
+    
+    const priorityLabel = getPriorityLabel(task.priority);
+    const deletedDate = formatDate(task.deleted_at || task.updated_at);
+    
+    tr.innerHTML = `
+      <td class="archive-title-cell">${task.title}</td>
+      <td><span class="badge" style="background: rgba(255,255,255,0.05); color: var(--color-text-secondary);">${task.status}</span></td>
+      <td><span class="badge badge-priority-${task.priority}">${priorityLabel}</span></td>
+      <td>${deletedDate}</td>
+      <td class="archive-action-cell">
+        <button class="btn btn-secondary btn-sm btn-view-history" data-id="${task.task_id}">Timeline</button>
+        <button class="btn btn-primary btn-sm btn-restore-task" data-id="${task.task_id}">Restore</button>
+      </td>
+    `;
+
+    tr.querySelector('.btn-view-history').addEventListener('click', () => {
+      openDetailDrawer(task.task_id);
+    });
+    tr.querySelector('.btn-restore-task').addEventListener('click', () => {
+      apiRestoreTask(task.task_id);
+    });
+    tbody.appendChild(tr);
+  });
 }
 
 // ==========================================
 // 5. DETAIL DRAWER LOGIC
 // ==========================================
+
+function renderDrawerFields(task) {
+  const container = document.getElementById('drawer-fields-container');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const metaGrid = document.createElement('div');
+  metaGrid.className = 'detail-meta-grid';
+
+  const onUpdate = (key, newValue) => {
+    handleDrawerFieldChange(key, newValue);
+  };
+
+  TASK_DISPLAY_CONFIG.forEach(f => {
+    const val = task[f.key];
+    if (typeof f.renderDetail !== 'function') return;
+    const element = f.renderDetail(val, onUpdate, task);
+    if (!element) return;
+
+    if (f.key === 'title') {
+      container.appendChild(element);
+    } else if (f.key === 'status' || f.key === 'priority' || f.key === 'due_date' || f.isDynamic) {
+      metaGrid.appendChild(element);
+    } else {
+      container.appendChild(element);
+    }
+  });
+
+  if (metaGrid.children.length > 0) {
+    const titleEl = container.querySelector('#detail-title');
+    if (titleEl) {
+      titleEl.after(metaGrid);
+    } else {
+      container.insertBefore(metaGrid, container.firstChild);
+    }
+  }
+}
 
 async function openDetailDrawer(taskId) {
   let task = tasks.find(t => t.task_id === taskId);
@@ -506,64 +829,61 @@ async function openDetailDrawer(taskId) {
   activeTaskId = taskId;
 
   const coreBadge = document.getElementById('detail-core-badge');
-  coreBadge.style.display = task.is_core ? 'inline-flex' : 'none';
+  if (coreBadge) coreBadge.style.display = task.is_core ? 'inline-flex' : 'none';
 
   const deleteBtn = document.getElementById('btn-delete-task');
-  if (task.is_deleted) {
-    deleteBtn.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-      <span>Restore Task</span>
-    `;
-    deleteBtn.className = 'btn btn-primary btn-full';
-  } else {
-    deleteBtn.innerHTML = `
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-      <span>Delete Task</span>
-    `;
-    deleteBtn.className = 'btn btn-danger btn-full';
+  if (deleteBtn) {
+    if (task.is_deleted) {
+      deleteBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        <span>Restore Task</span>
+      `;
+      deleteBtn.className = 'btn btn-primary btn-full';
+    } else {
+      deleteBtn.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+        <span>Delete Task</span>
+      `;
+      deleteBtn.className = 'btn btn-danger btn-full';
+    }
   }
 
   const priorityBadge = document.getElementById('detail-priority-badge');
-  priorityBadge.textContent = task.priority;
-  priorityBadge.className = `badge badge-priority-${task.priority}`;
+  if (priorityBadge) {
+    priorityBadge.textContent = task.priority;
+    priorityBadge.className = `badge badge-priority-${task.priority}`;
+  }
 
-  document.getElementById('detail-title').textContent = task.title;
-  document.getElementById('detail-status-select').value = task.status;
-  document.getElementById('detail-due-date').value = task.due_date ? task.due_date.slice(0, 16) : '';
-  document.getElementById('detail-description').value = task.description || '';
-
-  renderDetailTags(task);
-  renderDetailCollaborators(task);
+  // Render all form fields dynamically
+  renderDrawerFields(task);
 
   // Video Section
   const videoSection = document.getElementById('drawer-video-section');
-  if (task.media_metadata && task.media_metadata.video_id) {
-    videoSection.style.display = 'flex';
-    document.getElementById('video-title').textContent = task.media_metadata.title || task.title;
-    document.getElementById('video-creator').textContent = `By ${task.media_metadata.creator_or_channel || 'Unknown Creator'}`;
-    document.getElementById('video-duration').textContent = `Duration: 46:01`;
-    document.getElementById('video-views').textContent = task.media_metadata.metrics_at_creation?.view_count 
-      ? `Views: ${Number(task.media_metadata.metrics_at_creation.view_count).toLocaleString()}`
-      : '';
-    loadVideo(task.media_metadata.video_id);
-  } else {
-    videoSection.style.display = 'none';
-  }
-
-  // Bookmarks Section
-  const bookmarksSection = document.getElementById('drawer-bookmarks-section');
-  if (task.curated_video_bookmarks && task.curated_video_bookmarks.length > 0) {
-    bookmarksSection.style.display = 'flex';
-    renderDetailBookmarks(task);
-  } else {
-    bookmarksSection.style.display = task.media_metadata ? 'flex' : 'none';
-    document.getElementById('bookmarks-list-container').innerHTML = 
-      '<p class="text-muted" style="font-size: 12px; font-style: italic; padding: 8px 0;">No bookmarks set yet.</p>';
+  if (videoSection) {
+    if (task.media_metadata && task.media_metadata.video_id) {
+      videoSection.style.display = 'flex';
+      const vTitle = document.getElementById('video-title');
+      if (vTitle) vTitle.textContent = task.media_metadata.title || task.title;
+      const vCreator = document.getElementById('video-creator');
+      if (vCreator) vCreator.textContent = `By ${task.media_metadata.creator_or_channel || 'Unknown Creator'}`;
+      const vDuration = document.getElementById('video-duration');
+      if (vDuration) vDuration.textContent = `Duration: 46:01`;
+      const vViews = document.getElementById('video-views');
+      if (vViews) {
+        vViews.textContent = task.media_metadata.metrics_at_creation?.view_count 
+          ? `Views: ${Number(task.media_metadata.metrics_at_creation.view_count).toLocaleString()}`
+          : '';
+      }
+      loadVideo(task.media_metadata.video_id);
+    } else {
+      videoSection.style.display = 'none';
+    }
   }
 
   renderDetailHistoryTimeline(taskId);
 
-  document.getElementById('detail-drawer').classList.add('open');
+  const drawer = document.getElementById('detail-drawer');
+  if (drawer) drawer.classList.add('open');
 }
 
 function closeDetailDrawer() {
@@ -700,87 +1020,6 @@ async function renderDetailHistoryTimeline(taskId) {
   });
 }
 
-function renderDetailTags(task) {
-  const container = document.getElementById('detail-tags-container');
-  container.innerHTML = '';
-  if (!task.task_specific_tags) return;
-  task.task_specific_tags.forEach((tag, idx) => {
-    const badge = document.createElement('span');
-    badge.className = 'detail-tag-badge';
-    badge.innerHTML = `
-      <span>#${tag}</span>
-      <button class="btn-remove-tag" data-index="${idx}" aria-label="Delete tag">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    `;
-    container.appendChild(badge);
-  });
-}
-
-function renderDetailCollaborators(task) {
-  const container = document.getElementById('collaborators-list-container');
-  container.innerHTML = '';
-  if (!task.collaborators || task.collaborators.length === 0) {
-    container.innerHTML = '<p class="text-muted" style="font-size:12px; font-style:italic;">No collaborators invited yet.</p>';
-    return;
-  }
-  task.collaborators.forEach((collab, idx) => {
-    const initials = collab.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase();
-    const item = document.createElement('div');
-    item.className = 'collaborator-item';
-    item.innerHTML = `
-      <div class="collab-left">
-        <div class="collab-avatar-lg">${initials}</div>
-        <div class="collab-info">
-          <span class="collab-name">${collab.name}</span>
-          <span class="collab-role">${collab.role}</span>
-        </div>
-      </div>
-      <div class="collab-right">
-        <select class="collab-status-select" data-index="${idx}">
-          <option value="INVITED" ${collab.status === 'INVITED' ? 'selected' : ''}>Invited</option>
-          <option value="JOINED" ${collab.status === 'JOINED' ? 'selected' : ''}>Joined</option>
-          <option value="DECLINED" ${collab.status === 'DECLINED' ? 'selected' : ''}>Declined</option>
-        </select>
-        <button class="btn-remove-collab" data-index="${idx}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    `;
-    container.appendChild(item);
-  });
-}
-
-function renderDetailBookmarks(task) {
-  const container = document.getElementById('bookmarks-list-container');
-  container.innerHTML = '';
-  task.curated_video_bookmarks.forEach((bm, idx) => {
-    const item = document.createElement('div');
-    item.className = 'bookmark-item';
-    item.innerHTML = `
-      <span class="bookmark-time-badge">${bm.timestamp}</span>
-      <div class="bookmark-info">
-        <span class="bookmark-label">${bm.label}</span>
-        ${bm.note ? `<span class="bookmark-note">${bm.note}</span>` : ''}
-      </div>
-      <button class="btn-delete-bookmark" data-index="${idx}">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-      </button>
-    `;
-    
-    item.addEventListener('click', (e) => {
-      if (e.target.closest('.btn-delete-bookmark')) return;
-      const seconds = parseTimestamp(bm.timestamp);
-      if (ytPlayer && ytPlayerReady && typeof ytPlayer.seekTo === 'function') {
-        ytPlayer.seekTo(seconds, true);
-        try { ytPlayer.playVideo(); } catch(e) {}
-        showToast(`Seeking video to ${bm.timestamp}`);
-      }
-    });
-
-    container.appendChild(item);
-  });
-}
 
 function handleDrawerFieldChange(field, val) {
   if (!activeTaskId) return;
@@ -789,12 +1028,17 @@ function handleDrawerFieldChange(field, val) {
 
   const payload = { ...task };
   
-  if (field === 'title') payload.title = val.trim();
-  if (field === 'description') payload.description = val.trim();
-  if (field === 'status') payload.status = val;
-  if (field === 'due_date') payload.due_date = val ? new Date(val).toISOString() : null;
+  if (field === 'due_date') {
+    payload.due_date = val ? new Date(val).toISOString() : null;
+  } else if (typeof val === 'string') {
+    payload[field] = val.trim();
+  } else {
+    payload[field] = val;
+  }
 
   apiUpdateTask(activeTaskId, payload).then(() => {
+    const updatedTask = tasks.find(t => t.task_id === activeTaskId);
+    renderDrawerFields(updatedTask);
     renderDetailHistoryTimeline(activeTaskId);
   });
 }
@@ -1706,124 +1950,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- Drawer controls ---
   document.getElementById('drawer-close').addEventListener('click', closeDetailDrawer);
 
-  document.getElementById('detail-title').addEventListener('blur', (e) => {
-    handleDrawerFieldChange('title', e.target.textContent);
-  });
-  document.getElementById('detail-title').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      e.target.blur();
-    }
-  });
-
-  document.getElementById('detail-description').addEventListener('blur', (e) => {
-    handleDrawerFieldChange('description', e.target.value);
-  });
-
-  document.getElementById('detail-status-select').addEventListener('change', (e) => {
-    handleDrawerFieldChange('status', e.target.value);
-  });
-
-  document.getElementById('detail-due-date').addEventListener('change', (e) => {
-    handleDrawerFieldChange('due_date', e.target.value);
-  });
-
-  // Drawer Tags
-  document.getElementById('btn-add-tag').addEventListener('click', () => {
-    if (!activeTaskId) return;
-    const task = tasks.find(t => t.task_id === activeTaskId);
-    const input = document.getElementById('new-tag-input');
-    const val = input.value.trim();
-    if (val && task) {
-      const payload = { ...task };
-      if (!payload.task_specific_tags) payload.task_specific_tags = [];
-      if (!payload.task_specific_tags.includes(val)) {
-        payload.task_specific_tags.push(val);
-        apiUpdateTask(activeTaskId, payload).then(() => {
-          const updatedTask = tasks.find(t => t.task_id === activeTaskId);
-          renderDetailTags(updatedTask);
-          renderDetailHistoryTimeline(activeTaskId);
-          input.value = '';
-        });
-      }
-    }
-  });
-
-  document.getElementById('detail-tags-container').addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-remove-tag');
-    if (!btn || !activeTaskId) return;
-    const task = tasks.find(t => t.task_id === activeTaskId);
-    if (task) {
-      const idx = parseInt(btn.dataset.index);
-      const payload = { ...task };
-      payload.task_specific_tags.splice(idx, 1);
-      apiUpdateTask(activeTaskId, payload).then(() => {
-        const updatedTask = tasks.find(t => t.task_id === activeTaskId);
-        renderDetailTags(updatedTask);
-        renderDetailHistoryTimeline(activeTaskId);
-      });
-    }
-  });
-
-  // Drawer Collaborators
-  document.getElementById('btn-add-collaborator').addEventListener('click', () => openModal('collaborator-modal'));
+  // Drawer Modal Closes
   document.getElementById('collab-close-btn').addEventListener('click', () => closeModal('collaborator-modal'));
   document.getElementById('collab-cancel-btn').addEventListener('click', () => closeModal('collaborator-modal'));
-
-  document.getElementById('collaborators-list-container').addEventListener('change', (e) => {
-    const select = e.target.closest('.collab-status-select');
-    if (!select || !activeTaskId) return;
-    const task = tasks.find(t => t.task_id === activeTaskId);
-    if (task) {
-      const idx = parseInt(select.dataset.index);
-      const payload = { ...task };
-      payload.collaborators[idx].status = select.value;
-      apiUpdateTask(activeTaskId, payload).then(() => {
-        renderDetailHistoryTimeline(activeTaskId);
-      });
-    }
-  });
-
-  document.getElementById('collaborators-list-container').addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-remove-collab');
-    if (!btn || !activeTaskId) return;
-    const task = tasks.find(t => t.task_id === activeTaskId);
-    if (task && confirm('Remove this collaborator?')) {
-      const idx = parseInt(btn.dataset.index);
-      const payload = { ...task };
-      payload.collaborators.splice(idx, 1);
-      apiUpdateTask(activeTaskId, payload).then(() => {
-        const updatedTask = tasks.find(t => t.task_id === activeTaskId);
-        renderDetailCollaborators(updatedTask);
-        renderDetailHistoryTimeline(activeTaskId);
-      });
-    }
-  });
-
-  // Drawer Bookmarks
-  document.getElementById('btn-add-bookmark').addEventListener('click', () => openModal('bookmark-modal'));
   document.getElementById('bookmark-close-btn').addEventListener('click', () => closeModal('bookmark-modal'));
   document.getElementById('bookmark-cancel-btn').addEventListener('click', () => closeModal('bookmark-modal'));
 
   // Time Travel Modal
   document.getElementById('time-travel-close-btn').addEventListener('click', () => closeModal('time-travel-modal'));
   document.getElementById('time-travel-cancel-btn').addEventListener('click', () => closeModal('time-travel-modal'));
-
-  document.getElementById('bookmarks-list-container').addEventListener('click', (e) => {
-    const btn = e.target.closest('.btn-delete-bookmark');
-    if (!btn || !activeTaskId) return;
-    const task = tasks.find(t => t.task_id === activeTaskId);
-    if (task && confirm('Delete this video bookmark?')) {
-      const idx = parseInt(btn.dataset.index);
-      const payload = { ...task };
-      payload.curated_video_bookmarks.splice(idx, 1);
-      apiUpdateTask(activeTaskId, payload).then(() => {
-        const updatedTask = tasks.find(t => t.task_id === activeTaskId);
-        renderDetailBookmarks(updatedTask);
-        renderDetailHistoryTimeline(activeTaskId);
-      });
-    }
-  });
 
   // Drawer Main delete/restore button
   document.getElementById('btn-delete-task').addEventListener('click', () => {
@@ -1910,7 +2045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     apiUpdateTask(activeTaskId, payload).then(() => {
       const updatedTask = tasks.find(t => t.task_id === activeTaskId);
-      renderDetailCollaborators(updatedTask);
+      renderDrawerFields(updatedTask);
       renderDetailHistoryTimeline(activeTaskId);
       closeModal('collaborator-modal');
     });
@@ -1946,7 +2081,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     apiUpdateTask(activeTaskId, payload).then(() => {
       const updatedTask = tasks.find(t => t.task_id === activeTaskId);
-      renderDetailBookmarks(updatedTask);
+      renderDrawerFields(updatedTask);
       renderDetailHistoryTimeline(activeTaskId);
       closeModal('bookmark-modal');
     });

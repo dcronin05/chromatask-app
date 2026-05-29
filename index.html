@@ -376,28 +376,8 @@
         </div>
 
         <div class="drawer-content" id="drawer-content-body">
-          <div class="drawer-section">
-            <h2 class="detail-title" id="detail-title" contenteditable="true">Task Title</h2>
-            <div class="detail-meta-grid">
-              <div class="meta-item">
-                <span class="meta-label">Status</span>
-                <select class="select-styled" id="detail-status-select">
-                  <option value="TODO">To Do</option>
-                  <option value="IN_PROGRESS">In Progress</option>
-                  <option value="COMPLETED">Completed</option>
-                </select>
-              </div>
-              <div class="meta-item">
-                <span class="meta-label">Due Date</span>
-                <input type="datetime-local" class="input-styled" id="detail-due-date" />
-              </div>
-            </div>
-          </div>
-
-          <div class="drawer-section">
-            <h3 class="section-subtitle">Description</h3>
-            <textarea class="textarea-styled" id="detail-description" placeholder="Add a description..."></textarea>
-          </div>
+          <!-- Dynamic Form Fields Container -->
+          <div id="drawer-fields-container" style="display: flex; flex-direction: column; gap: 16px;"></div>
 
           <!-- Video Link Section (Only shows if task has video metadata) -->
           <div class="drawer-section video-section" id="drawer-video-section">
@@ -412,41 +392,6 @@
                 <span id="video-duration">Duration: 46:01</span>
                 <span id="video-views">Views: 138K</span>
               </div>
-            </div>
-          </div>
-
-          <!-- Bookmarks Section (Only shows if task has bookmarks) -->
-          <div class="drawer-section bookmarks-section" id="drawer-bookmarks-section">
-            <div class="section-header-row">
-              <h3 class="section-subtitle">Video Bookmarks</h3>
-              <button class="btn-text" id="btn-add-bookmark">+ Add Bookmark</button>
-            </div>
-            <p class="section-instructions">Click timestamps to jump to that moment in the video lecture.</p>
-            <div class="bookmarks-list" id="bookmarks-list-container">
-              <!-- Bookmark items dynamically populated -->
-            </div>
-          </div>
-
-          <!-- Collaborators Section -->
-          <div class="drawer-section collaborators-section" id="drawer-collaborators-section">
-            <div class="section-header-row">
-              <h3 class="section-subtitle">Collaborators</h3>
-              <button class="btn-text" id="btn-add-collaborator">+ Invite</button>
-            </div>
-            <div class="collaborators-list" id="collaborators-list-container">
-              <!-- Collaborator items -->
-            </div>
-          </div>
-
-          <!-- Tags Section -->
-          <div class="drawer-section tags-section">
-            <h3 class="section-subtitle">Tags</h3>
-            <div class="detail-tags-list" id="detail-tags-container">
-              <!-- Tags list -->
-            </div>
-            <div class="tag-input-row">
-              <input type="text" id="new-tag-input" placeholder="Add tag..." class="input-styled input-sm" />
-              <button class="btn btn-secondary btn-sm" id="btn-add-tag">Add</button>
             </div>
           </div>
 
