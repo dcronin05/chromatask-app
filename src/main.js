@@ -5,18 +5,18 @@ import './style.css';
 // ==========================================
 
 let tasks = [];
-let activeTaskId = null;
-let currentView = 'DASHBOARD'; // 'DASHBOARD', 'ARCHIVE', or 'DOCS'
-let currentDocsSubtab = 'explorer'; // 'explorer', 'api', 'health', or 'guides'
+let activeTaskId = localStorage.getItem('chromatask_active_task_id') || null;
+let currentView = localStorage.getItem('chromatask_current_view') || 'DASHBOARD'; // 'DASHBOARD', 'ARCHIVE', or 'DOCS'
+let currentDocsSubtab = localStorage.getItem('chromatask_docs_subtab') || 'explorer'; // 'explorer', 'api', 'health', or 'guides'
 let currentDocsCommit = ''; // Selected commit hash for versioning (empty string means Live Code)
 let oldHealthStr = '';
 let oldTestsStr = '';
 let oldMetadataStr = '';
 let oldGuideStr = '';
 let activeFilters = {
-  search: '',
-  priority: 'ALL',
-  tag: null
+  search: localStorage.getItem('chromatask_filter_search') || '',
+  priority: localStorage.getItem('chromatask_filter_priority') || 'ALL',
+  tag: localStorage.getItem('chromatask_filter_tag') || null
 };
 
 // ==========================================
@@ -403,6 +403,7 @@ async function fetchTasks() {
     if (!response.ok) throw new Error('Failed to fetch tasks');
     tasks = await response.json();
     syncDynamicFields(tasks);
+    updateSidebarCounters();
   } catch (error) {
     console.error('API Error:', error);
     showToast('Failed to load tasks from server.');
@@ -480,6 +481,16 @@ async function apiResetDatabase() {
     });
     if (!response.ok) throw new Error('Failed to reset database');
     showToast('Database wiped successfully!');
+    
+    // Clear view persistence states
+    localStorage.removeItem('chromatask_current_view');
+    localStorage.removeItem('chromatask_docs_subtab');
+    localStorage.removeItem('chromatask_filter_search');
+    localStorage.removeItem('chromatask_filter_priority');
+    localStorage.removeItem('chromatask_filter_tag');
+    localStorage.removeItem('chromatask_active_task_id');
+    localStorage.removeItem('chromatask_sidebar_collapsed');
+
     closeDetailDrawer();
     await fetchTasks();
     renderView();
@@ -685,10 +696,96 @@ function renderSidebarTags(tagSet) {
     pill.textContent = `#${tag}`;
     pill.addEventListener('click', () => {
       activeFilters.tag = activeFilters.tag === tag ? null : tag;
+      if (activeFilters.tag) {
+        localStorage.setItem('chromatask_filter_tag', activeFilters.tag);
+      } else {
+        localStorage.removeItem('chromatask_filter_tag');
+      }
       renderBoard();
     });
     container.appendChild(pill);
   });
+}
+
+function updateSidebarCounters() {
+  const activeTasks = tasks.filter(t => !t.is_deleted);
+  const activeCount = activeTasks.filter(t => t.status !== 'COMPLETED').length;
+  const archivedCount = tasks.filter(t => t.is_deleted).length;
+  
+  // Update badges
+  const dashBadge = document.getElementById('counter-dashboard');
+  if (dashBadge) dashBadge.textContent = activeCount;
+  
+  const archBadge = document.getElementById('counter-archive');
+  if (archBadge) archBadge.textContent = archivedCount;
+  
+  // Calculate priority counts
+  const highCount = activeTasks.filter(t => t.status !== 'COMPLETED' && t.priority === 'HIGH').length;
+  const medCount = activeTasks.filter(t => t.status !== 'COMPLETED' && t.priority === 'MEDIUM').length;
+  const lowCount = activeTasks.filter(t => t.status !== 'COMPLETED' && t.priority === 'LOW').length;
+  
+  const highBadge = document.getElementById('counter-priority-high');
+  if (highBadge) highBadge.textContent = highCount;
+  
+  const medBadge = document.getElementById('counter-priority-medium');
+  if (medBadge) medBadge.textContent = medCount;
+  
+  const lowBadge = document.getElementById('counter-priority-low');
+  if (lowBadge) lowBadge.textContent = lowCount;
+
+  // Update tooltips for collapsed state
+  const navAll = document.getElementById('nav-all');
+  if (navAll) navAll.setAttribute('data-tooltip', `Dashboard (${activeCount} active)`);
+  
+  const navArch = document.getElementById('nav-archive');
+  if (navArch) navArch.setAttribute('data-tooltip', `Archive & History (${archivedCount} archived)`);
+  
+  const filterHigh = document.getElementById('filter-high');
+  if (filterHigh) filterHigh.setAttribute('data-tooltip', `High Priority (${highCount} tasks)`);
+  
+  const filterMed = document.getElementById('filter-med');
+  if (filterMed) filterMed.setAttribute('data-tooltip', `Medium Priority (${medCount} tasks)`);
+  
+  const filterLow = document.getElementById('filter-low');
+  if (filterLow) filterLow.setAttribute('data-tooltip', `Low Priority (${lowCount} tasks)`);
+}
+
+function syncDocsSidebarBadge(score, warningCount) {
+  const badge = document.getElementById('counter-docs');
+  if (badge) {
+    badge.textContent = `${score}%`;
+    if (score >= 90) {
+      badge.style.color = '#10b981';
+      badge.style.backgroundColor = 'rgba(16, 185, 129, 0.15)';
+      badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';
+    } else if (score >= 70) {
+      badge.style.color = '#fbbf24';
+      badge.style.backgroundColor = 'rgba(251, 191, 36, 0.15)';
+      badge.style.borderColor = 'rgba(251, 191, 36, 0.3)';
+    } else {
+      badge.style.color = '#f43f5e';
+      badge.style.backgroundColor = 'rgba(244, 63, 94, 0.15)';
+      badge.style.borderColor = 'rgba(244, 63, 94, 0.3)';
+    }
+  }
+  const docsNav = document.getElementById('nav-docs');
+  if (docsNav) {
+    docsNav.setAttribute('data-tooltip', `Dev Docs & Health (${score}% Score, ${warningCount} warnings)`);
+  }
+}
+
+async function updateDocsSidebarCounter() {
+  try {
+    const res = await fetch('/api/docs/health');
+    if (res.ok) {
+      const data = await res.json();
+      const score = data.score || 100;
+      const warningCount = data.warnings ? data.warnings.length : 0;
+      syncDocsSidebarBadge(score, warningCount);
+    }
+  } catch (e) {
+    console.error('Failed to fetch doc health for sidebar counter', e);
+  }
 }
 
 /**
@@ -859,6 +956,7 @@ async function openDetailDrawer(taskId) {
   if (!task) return;
 
   activeTaskId = taskId;
+  localStorage.setItem('chromatask_active_task_id', taskId);
 
   const coreBadge = document.getElementById('detail-core-badge');
   if (coreBadge) coreBadge.style.display = task.is_core ? 'inline-flex' : 'none';
@@ -921,6 +1019,7 @@ async function openDetailDrawer(taskId) {
 function closeDetailDrawer() {
   document.getElementById('detail-drawer').classList.remove('open');
   activeTaskId = null;
+  localStorage.removeItem('chromatask_active_task_id');
   if (ytPlayer && ytPlayerReady && typeof ytPlayer.pauseVideo === 'function') {
     try { ytPlayer.pauseVideo(); } catch(e) {}
   }
@@ -1088,6 +1187,7 @@ function handleDrawerFieldChange(field, val) {
 
 function loadDocsSubtab(subtab) {
   currentDocsSubtab = subtab;
+  localStorage.setItem('chromatask_docs_subtab', subtab);
 
   // Toggle subnav header styling
   document.querySelectorAll('.docs-subnav-btn').forEach(btn => {
@@ -1255,6 +1355,10 @@ function renderCodeHealthData(data) {
   
   const score = data.score || 0;
   document.getElementById('health-score-text').textContent = `${score}%`;
+
+  if (!currentDocsCommit) {
+    syncDocsSidebarBadge(score, data.warnings ? data.warnings.length : 0);
+  }
 
   // 2. Animate SVG circular ring
   const fillCircle = document.getElementById('health-gauge-fill');
@@ -1973,6 +2077,7 @@ async function openTimeTravelModal(taskId, historyId) {
 }
 
 let isPolling = false;
+let pollingTick = 0;
 /**
  * Starts the background polling interval to keep tasks and console logs synced.
  */
@@ -1980,6 +2085,7 @@ function startPolling() {
   setInterval(async () => {
     if (document.hidden || isPolling) return;
     isPolling = true;
+    pollingTick++;
     const oldTasksStr = JSON.stringify(tasks);
     try {
       await fetchTasks();
@@ -2056,6 +2162,11 @@ function startPolling() {
           }
         }
       }
+
+      // Periodically update docs health score sidebar counter (every 15s / 5 ticks)
+      if (pollingTick % 5 === 0) {
+        updateDocsSidebarCounter();
+      }
     } catch (e) {
       console.warn("Polling error:", e);
     } finally {
@@ -2070,7 +2181,70 @@ function startPolling() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await fetchTasks();
+
+  // Restore currentView and filter states from localStorage
+  currentView = localStorage.getItem('chromatask_current_view') || 'DASHBOARD';
+  currentDocsSubtab = localStorage.getItem('chromatask_docs_subtab') || 'explorer';
+  activeFilters.priority = localStorage.getItem('chromatask_filter_priority') || 'ALL';
+  activeFilters.tag = localStorage.getItem('chromatask_filter_tag') || null;
+  activeTaskId = localStorage.getItem('chromatask_active_task_id') || null;
+  activeFilters.search = localStorage.getItem('chromatask_filter_search') || '';
+
+  // Restore search input value
+  const searchInp = document.getElementById('search-input');
+  if (searchInp) {
+    searchInp.value = activeFilters.search;
+  }
+
+  // Highlight correct navigation item in sidebar
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
+  if (currentView === 'DASHBOARD') {
+    if (activeFilters.priority !== 'ALL') {
+      const activeFilterBtn = document.querySelector(`.filter-btn[data-filter="priority-${activeFilters.priority}"]`);
+      if (activeFilterBtn) activeFilterBtn.classList.add('active');
+    } else {
+      document.getElementById('nav-all').classList.add('active');
+    }
+  } else if (currentView === 'ARCHIVE') {
+    document.getElementById('nav-archive').classList.add('active');
+  } else if (currentView === 'DOCS') {
+    document.getElementById('nav-docs').classList.add('active');
+    await fetchDocsCommits();
+  }
+
   renderView();
+
+  // Restore collapse preference
+  const isCollapsed = localStorage.getItem('chromatask_sidebar_collapsed') === 'true';
+  if (isCollapsed) {
+    const sidebar = document.getElementById('app-sidebar');
+    const container = document.querySelector('.app-container');
+    if (sidebar) sidebar.classList.add('collapsed');
+    if (container) container.classList.add('collapsed');
+  }
+
+  // Bind collapse button listener
+  const toggleBtn = document.getElementById('btn-toggle-sidebar');
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+      const sidebar = document.getElementById('app-sidebar');
+      const container = document.querySelector('.app-container');
+      if (sidebar && container) {
+        sidebar.classList.toggle('collapsed');
+        container.classList.toggle('collapsed');
+        localStorage.setItem('chromatask_sidebar_collapsed', sidebar.classList.contains('collapsed'));
+      }
+    });
+  }
+
+  // Auto-reopen detail drawer if saved taskId exists
+  if (activeTaskId) {
+    openDetailDrawer(activeTaskId);
+  }
+
+  // Update docs sidebar counter badge
+  updateDocsSidebarCounter();
+
   startPolling();
 
   // --- View toggles ---
@@ -2080,6 +2254,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentView = 'DASHBOARD';
     activeFilters.tag = null;
     activeFilters.priority = 'ALL';
+    
+    // Save state
+    localStorage.setItem('chromatask_current_view', 'DASHBOARD');
+    localStorage.setItem('chromatask_filter_priority', 'ALL');
+    localStorage.removeItem('chromatask_filter_tag');
+    
     renderView();
   });
 
@@ -2087,6 +2267,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
     e.currentTarget.classList.add('active');
     currentView = 'ARCHIVE';
+    
+    // Save state
+    localStorage.setItem('chromatask_current_view', 'ARCHIVE');
+    
     renderView();
   });
 
@@ -2094,6 +2278,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
     e.currentTarget.classList.add('active');
     currentView = 'DOCS';
+    
+    // Save state
+    localStorage.setItem('chromatask_current_view', 'DOCS');
+    
     await fetchDocsCommits();
     renderView();
   });
@@ -2132,6 +2320,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         activeFilters.priority = filterVal.split('-')[1];
       }
       activeFilters.tag = null;
+      currentView = 'DASHBOARD';
+      
+      // Save state
+      localStorage.setItem('chromatask_current_view', 'DASHBOARD');
+      localStorage.setItem('chromatask_filter_priority', activeFilters.priority);
+      localStorage.removeItem('chromatask_filter_tag');
+      
       renderBoard();
     });
   });
@@ -2139,6 +2334,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- Search input ---
   document.getElementById('search-input').addEventListener('input', (e) => {
     activeFilters.search = e.target.value;
+    localStorage.setItem('chromatask_filter_search', activeFilters.search);
     renderBoard();
   });
 

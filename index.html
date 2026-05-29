@@ -28,39 +28,48 @@
             </svg>
           </div>
           <span class="brand-name">ChromaTask</span>
+          <button class="btn-toggle-sidebar" id="btn-toggle-sidebar" aria-label="Toggle Sidebar" title="Collapse Sidebar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg>
+          </button>
         </div>
 
         <nav class="sidebar-nav">
           <div class="nav-section">
             <span class="nav-section-title">Navigation</span>
-            <button class="nav-item active" id="nav-all">
+            <button class="nav-item active" id="nav-all" data-tooltip="Dashboard">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-              <span>Dashboard</span>
+              <span class="nav-label">Dashboard</span>
+              <span class="nav-counter" id="counter-dashboard">0</span>
             </button>
-            <button class="nav-item" id="nav-archive">
+            <button class="nav-item" id="nav-archive" data-tooltip="Archive & History">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>Archive & History</span>
+              <span class="nav-label">Archive & History</span>
+              <span class="nav-counter" id="counter-archive">0</span>
             </button>
-            <button class="nav-item" id="nav-docs">
+            <button class="nav-item" id="nav-docs" data-tooltip="Dev Docs & Health">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-              <span>Dev Docs & Health</span>
+              <span class="nav-label">Dev Docs & Health</span>
+              <span class="nav-counter docs-badge" id="counter-docs">100%</span>
             </button>
           </div>
 
           <div class="nav-section-filters" id="sidebar-filters-section">
             <div class="nav-section">
               <span class="nav-section-title">Priority Filters</span>
-              <button class="nav-item filter-btn" data-filter="priority-HIGH" id="filter-high">
+              <button class="nav-item filter-btn" data-filter="priority-HIGH" id="filter-high" data-tooltip="High Priority">
                 <span class="indicator-dot high"></span>
-                <span>High Priority</span>
+                <span class="nav-label">High Priority</span>
+                <span class="nav-counter priority-high" id="counter-priority-high">0</span>
               </button>
-              <button class="nav-item filter-btn" data-filter="priority-MEDIUM" id="filter-med">
+              <button class="nav-item filter-btn" data-filter="priority-MEDIUM" id="filter-med" data-tooltip="Medium Priority">
                 <span class="indicator-dot medium"></span>
-                <span>Medium Priority</span>
+                <span class="nav-label">Medium Priority</span>
+                <span class="nav-counter priority-medium" id="counter-priority-medium">0</span>
               </button>
-              <button class="nav-item filter-btn" data-filter="priority-LOW" id="filter-low">
+              <button class="nav-item filter-btn" data-filter="priority-LOW" id="filter-low" data-tooltip="Low Priority">
                 <span class="indicator-dot low"></span>
-                <span>Low Priority</span>
+                <span class="nav-label">Low Priority</span>
+                <span class="nav-counter priority-low" id="counter-priority-low">0</span>
               </button>
             </div>
 
