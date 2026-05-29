@@ -1288,6 +1288,9 @@ body {
   position: relative;
   padding-left: 18px;
   margin-top: 10px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 8px;
 }
 
 /* Vertical timeline line */

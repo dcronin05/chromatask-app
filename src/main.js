@@ -16,6 +16,64 @@ let activeFilters = {
 };
 
 // ==========================================
+// TASK DISPLAY CONFIGURATION (Single Source of Truth)
+// ==========================================
+const TASK_DISPLAY_CONFIG = [
+  {
+    key: 'title',
+    label: 'Title',
+    render: (val) => val || '<em class="text-muted">Empty</em>',
+    equals: (a, b) => a === b
+  },
+  {
+    key: 'description',
+    label: 'Description',
+    render: (val) => val || '<em class="text-muted">Empty</em>',
+    equals: (a, b) => a === b
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    render: (val) => `<span class="badge" style="background: rgba(255,255,255,0.05);">${val}</span>`,
+    equals: (a, b) => a === b
+  },
+  {
+    key: 'priority',
+    label: 'Priority',
+    render: (val) => `<span class="badge badge-priority-${val}">${val}</span>`,
+    equals: (a, b) => a === b
+  },
+  {
+    key: 'due_date',
+    label: 'Due Date',
+    render: (val) => val ? formatDate(val) : '<em class="text-muted">None</em>',
+    equals: (a, b) => {
+      if (!a && !b) return true;
+      if (!a || !b) return false;
+      return a.slice(0, 16) === b.slice(0, 16);
+    }
+  },
+  {
+    key: 'task_specific_tags',
+    label: 'Tags',
+    render: (val) => (val || []).map(t => `<span class="detail-tag-badge">#${t}</span>`).join(' ') || '<em class="text-muted">None</em>',
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  },
+  {
+    key: 'collaborators',
+    label: 'Collaborators',
+    render: (val) => (val || []).map(c => `<span class="badge" style="background: rgba(255,255,255,0.03); margin-bottom: 2px;">${c.name} (${c.role})</span>`).join('<br>') || '<em class="text-muted">None</em>',
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  },
+  {
+    key: 'curated_video_bookmarks',
+    label: 'Video Bookmarks',
+    render: (val) => (val || []).map(b => `<span style="font-size:11px;"><code>${b.timestamp}</code> ${b.label}</span>`).join('<br>') || '<em class="text-muted">None</em>',
+    equals: (a, b) => JSON.stringify(a) === JSON.stringify(b)
+  }
+];
+
+// ==========================================
 // 2. BACKEND API SYNCING
 // ==========================================
 
@@ -1460,18 +1518,6 @@ async function openTimeTravelModal(taskId, historyId) {
     const container = document.getElementById('time-travel-diff-body');
     container.innerHTML = '';
 
-    // Define trackable keys to display
-    const fieldsToInspect = [
-      { key: 'title', label: 'Title', type: 'text' },
-      { key: 'description', label: 'Description', type: 'text' },
-      { key: 'status', label: 'Status', type: 'badge' },
-      { key: 'priority', label: 'Priority', type: 'priority' },
-      { key: 'due_date', label: 'Due Date', type: 'date' },
-      { key: 'task_specific_tags', label: 'Tags', type: 'tags' },
-      { key: 'collaborators', label: 'Collaborators', type: 'collaborators' },
-      { key: 'curated_video_bookmarks', label: 'Video Bookmarks', type: 'bookmarks' }
-    ];
-
     // Build left & right columns
     const leftCol = document.createElement('div');
     leftCol.className = 'diff-column old';
@@ -1481,54 +1527,15 @@ async function openTimeTravelModal(taskId, historyId) {
     rightCol.className = 'diff-column new';
     rightCol.innerHTML = `<h3>Current Live State</h3>`;
 
-    fieldsToInspect.forEach(f => {
+    TASK_DISPLAY_CONFIG.forEach(f => {
       const valOld = reconstructed[f.key];
       const valNew = current[f.key];
 
-      let isChanged = false;
-      // Equivalence checking
-      if (Array.isArray(valOld) || Array.isArray(valNew)) {
-        isChanged = JSON.stringify(valOld) !== JSON.stringify(valNew);
-      } else if (f.key === 'due_date' && valOld && valNew) {
-        isChanged = valOld.slice(0, 16) !== valNew.slice(0, 16);
-      } else {
-        isChanged = valOld !== valNew;
-      }
-
+      const isChanged = !f.equals(valOld, valNew);
       const cardClass = `diff-field-card ${isChanged ? 'changed' : ''}`;
 
-      // Format representations
-      let reprOld = '';
-      let reprNew = '';
-
-      if (f.type === 'text') {
-        reprOld = valOld || '<em class="text-muted">Empty</em>';
-        reprNew = valNew || '<em class="text-muted">Empty</em>';
-      } else if (f.type === 'badge') {
-        reprOld = `<span class="badge" style="background: rgba(255,255,255,0.05);">${valOld}</span>`;
-        reprNew = `<span class="badge" style="background: rgba(255,255,255,0.05);">${valNew}</span>`;
-      } else if (f.type === 'priority') {
-        reprOld = `<span class="badge badge-priority-${valOld}">${valOld}</span>`;
-        reprNew = `<span class="badge badge-priority-${valNew}">${valNew}</span>`;
-      } else if (f.type === 'date') {
-        reprOld = valOld ? formatDate(valOld) : '<em class="text-muted">None</em>';
-        reprNew = valNew ? formatDate(valNew) : '<em class="text-muted">None</em>';
-      } else if (f.type === 'tags') {
-        const oldTags = valOld || [];
-        const newTags = valNew || [];
-        reprOld = oldTags.map(t => `<span class="detail-tag-badge">#${t}</span>`).join(' ') || '<em class="text-muted">None</em>';
-        reprNew = newTags.map(t => `<span class="detail-tag-badge">#${t}</span>`).join(' ') || '<em class="text-muted">None</em>';
-      } else if (f.type === 'collaborators') {
-        const oldCols = valOld || [];
-        const newCols = valNew || [];
-        reprOld = oldCols.map(c => `<span class="badge" style="background: rgba(255,255,255,0.03); margin-bottom: 2px;">${c.name} (${c.role})</span>`).join('<br>') || '<em class="text-muted">None</em>';
-        reprNew = newCols.map(c => `<span class="badge" style="background: rgba(255,255,255,0.03); margin-bottom: 2px;">${c.name} (${c.role})</span>`).join('<br>') || '<em class="text-muted">None</em>';
-      } else if (f.type === 'bookmarks') {
-        const oldBms = valOld || [];
-        const newBms = valNew || [];
-        reprOld = oldBms.map(b => `<span style="font-size:11px;"><code>${b.timestamp}</code> ${b.label}</span>`).join('<br>') || '<em class="text-muted">None</em>';
-        reprNew = newBms.map(b => `<span style="font-size:11px;"><code>${b.timestamp}</code> ${b.label}</span>`).join('<br>') || '<em class="text-muted">None</em>';
-      }
+      const reprOld = f.render(valOld);
+      const reprNew = f.render(valNew);
 
       // Add diff styling highlight classes if changed
       const valClassOld = isChanged ? 'diff-val-box diff-deleted' : 'diff-val-box diff-unchanged';
