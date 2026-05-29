@@ -3,6 +3,7 @@ import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from services import TaskService
+from doc_service import DocService, PythonCodeAnalyzer
 
 app = Flask(__name__)
 # Enable CORS for cross-origin local testing if needed
@@ -12,6 +13,11 @@ DB_FILE = "db.json"
 SEED_FILE = "gemini-code-1780008469746.json"
 
 task_service = TaskService(DB_FILE)
+
+# Initialize DocService and register Python AST analyzer
+code_doc_service = DocService(os.path.dirname(os.path.abspath(__file__)))
+code_doc_service.register_analyzer(".py", PythonCodeAnalyzer)
+CODEBASE_FILES = ["models.py", "repositories.py", "services.py", "server.py", "doc_service.py"]
 
 # ==========================================
 # DATABASE INITIALIZATION
@@ -115,6 +121,61 @@ def reset_database():
     try:
         task_service.reset_database()
         return jsonify({"message": "Database reset completed"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ==========================================
+# DEVELOPER DOCS & QUALITY API
+# ==========================================
+
+@app.route("/api/docs/metadata", methods=["GET"])
+def get_docs_metadata():
+    try:
+        report = code_doc_service.analyze_project(CODEBASE_FILES)
+        metadata = {
+            "files": [
+                {
+                    "file_name": f["metadata"]["file_name"],
+                    "classes": f["metadata"]["classes"],
+                    "stats": f["metadata"]["stats"]
+                }
+                for f in report["files_reports"]
+            ]
+        }
+        return jsonify(metadata), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/docs/health", methods=["GET"])
+def get_docs_health():
+    try:
+        report = code_doc_service.analyze_project(CODEBASE_FILES)
+        health = {
+            "score": report["score"],
+            "files_scanned": report["files_scanned"],
+            "stats": report["stats"],
+            "warnings": report["warnings"]
+        }
+        return jsonify(health), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/docs/guides", methods=["GET"])
+def get_guides_list():
+    guides = ["architecture", "database"]
+    return jsonify(guides), 200
+
+
+@app.route("/api/docs/guides/<name>", methods=["GET"])
+def get_guide(name):
+    try:
+        content = code_doc_service.get_markdown_guide(name)
+        if not content:
+            return jsonify({"error": "Guide not found"}), 404
+        return jsonify({"name": name, "content": content}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

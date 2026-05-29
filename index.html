@@ -41,6 +41,10 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
               <span>Archive & History</span>
             </button>
+            <button class="nav-item" id="nav-docs">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              <span>Dev Docs & Health</span>
+            </button>
           </div>
 
           <div class="nav-section-filters" id="sidebar-filters-section">
@@ -164,6 +168,116 @@
                 <!-- Dynamically populated -->
               </tbody>
             </table>
+        </div>
+
+        <!-- Developer Docs & Code Health Console (Hidden by default) -->
+        <div class="docs-container" id="docs-container" style="display: none;">
+          <div class="docs-subnav">
+            <button class="docs-subnav-btn active" data-subtab="explorer" id="subnav-explorer">Class Explorer</button>
+            <button class="docs-subnav-btn" data-subtab="api" id="subnav-api">API Reference</button>
+            <button class="docs-subnav-btn" data-subtab="health" id="subnav-health">Code Health</button>
+            <button class="docs-subnav-btn" data-subtab="guides" id="subnav-guides">Architecture Guides</button>
+          </div>
+
+          <div class="docs-tab-content-wrapper">
+            <!-- Sub-tab: Class Explorer -->
+            <div class="docs-subtab-panel" id="panel-explorer">
+              <div class="panel-header-row">
+                <h2>OOP Class & Method Explorer</h2>
+                <p>Real-time reflection of classes, docstrings, and signatures analyzed in models, repositories, and services.</p>
+              </div>
+              <div class="class-explorer-grid" id="class-explorer-container">
+                <!-- Dynamically populated class cards -->
+              </div>
+            </div>
+
+            <!-- Sub-tab: API Reference -->
+            <div class="docs-subtab-panel" id="panel-api" style="display: none;">
+              <div class="panel-header-row">
+                <h2>Flask API Reference Specs</h2>
+                <p>Endpoint routing catalog and HTTP method specification parameters.</p>
+              </div>
+              <div class="api-ref-table-wrapper">
+                <table class="archive-table api-ref-table">
+                  <thead>
+                    <tr>
+                      <th style="width: 250px;">Endpoint</th>
+                      <th style="width: 100px;">Method</th>
+                      <th>Description / Signature</th>
+                    </tr>
+                  </thead>
+                  <tbody id="api-ref-table-body">
+                    <!-- Dynamically populated endpoint rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Sub-tab: Code Health -->
+            <div class="docs-subtab-panel" id="panel-health" style="display: none;">
+              <div class="health-dashboard-grid">
+                <!-- Left: Gauge ring -->
+                <div class="health-summary-card">
+                  <h3>Code Quality Health</h3>
+                  <div class="health-gauge-wrapper">
+                    <!-- SVG Health Ring -->
+                    <svg class="health-gauge-svg" viewBox="0 0 120 120">
+                      <circle class="gauge-bg" cx="60" cy="60" r="50" />
+                      <circle class="gauge-fill" id="health-gauge-fill" cx="60" cy="60" r="50" />
+                    </svg>
+                    <div class="health-score-val" id="health-score-text">100%</div>
+                  </div>
+                  <div class="health-stats-row">
+                    <div class="health-stat-item">
+                      <span class="stat-num" id="health-stat-files">0</span>
+                      <span class="stat-lbl">Files Scanned</span>
+                    </div>
+                    <div class="health-stat-item">
+                      <span class="stat-num" id="health-stat-classes">0</span>
+                      <span class="stat-lbl">Classes</span>
+                    </div>
+                    <div class="health-stat-item">
+                      <span class="stat-num" id="health-stat-methods">0</span>
+                      <span class="stat-lbl">Methods</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Right: Warnings list -->
+                <div class="health-warnings-card">
+                  <h3>Analysis Suggestions & Warnings</h3>
+                  <p class="section-instructions" style="margin-bottom: 12px;">Real-time AST checks for missing docstrings, casing violations, and long functions.</p>
+                  <div class="warnings-table-wrapper">
+                    <table class="archive-table warnings-table">
+                      <thead>
+                        <tr>
+                          <th>File</th>
+                          <th>Scope / Location</th>
+                          <th>Warning Description</th>
+                          <th style="width: 80px;">Line</th>
+                        </tr>
+                      </thead>
+                      <tbody id="warnings-table-body">
+                        <!-- Dynamically populated warnings -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sub-tab: Guides -->
+            <div class="docs-subtab-panel" id="panel-guides" style="display: none;">
+              <div class="guides-layout">
+                <div class="guides-sidebar" id="guides-list-container">
+                  <!-- Guides filenames listed here -->
+                </div>
+                <div class="guide-preview-pane" id="guide-preview-body">
+                  <div class="preview-placeholder">Select a guide from the sidebar to display developer documentation.</div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 

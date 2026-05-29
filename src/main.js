@@ -6,7 +6,8 @@ import './style.css';
 
 let tasks = [];
 let activeTaskId = null;
-let currentView = 'DASHBOARD'; // 'DASHBOARD' or 'ARCHIVE'
+let currentView = 'DASHBOARD'; // 'DASHBOARD', 'ARCHIVE', or 'DOCS'
+let currentDocsSubtab = 'explorer'; // 'explorer', 'api', 'health', or 'guides'
 let activeFilters = {
   search: '',
   priority: 'ALL',
@@ -98,7 +99,7 @@ async function apiResetDatabase() {
       method: 'POST'
     });
     if (!response.ok) throw new Error('Failed to reset database');
-    showToast('Database reset successfully. Core task restored!');
+    showToast('Database wiped successfully!');
     closeDetailDrawer();
     await fetchTasks();
     renderView();
@@ -186,7 +187,7 @@ function parseTimestamp(ts) {
 }
 
 // ==========================================
-// 4. RENDERING SYSTEM
+// 4. GENERAL UI RENDERING
 // ==========================================
 
 function getPriorityLabel(priority) {
@@ -204,30 +205,41 @@ function isOverdue(dateStr) {
   return new Date(dateStr) < new Date();
 }
 
-// Render either Dashboard Board or Archive list depending on state
 function renderView() {
   if (currentView === 'DASHBOARD') {
     document.getElementById('board-container').style.display = 'grid';
     document.getElementById('archive-container').style.display = 'none';
+    document.getElementById('docs-container').style.display = 'none';
     document.getElementById('sidebar-filters-section').style.display = 'block';
     document.getElementById('header-search-box').style.display = 'flex';
     document.getElementById('btn-add-task').style.display = 'inline-flex';
     document.getElementById('page-title').textContent = 'Workspace';
     
     renderBoard();
-  } else {
+  } else if (currentView === 'ARCHIVE') {
     document.getElementById('board-container').style.display = 'none';
     document.getElementById('archive-container').style.display = 'block';
+    document.getElementById('docs-container').style.display = 'none';
     document.getElementById('sidebar-filters-section').style.display = 'none';
     document.getElementById('header-search-box').style.display = 'none';
     document.getElementById('btn-add-task').style.display = 'none';
     document.getElementById('page-title').textContent = 'Archive & Logs';
     
     renderArchive();
+  } else if (currentView === 'DOCS') {
+    document.getElementById('board-container').style.display = 'none';
+    document.getElementById('archive-container').style.display = 'none';
+    document.getElementById('docs-container').style.display = 'block';
+    document.getElementById('sidebar-filters-section').style.display = 'none';
+    document.getElementById('header-search-box').style.display = 'none';
+    document.getElementById('btn-add-task').style.display = 'none';
+    document.getElementById('page-title').textContent = 'Developer Console';
+    document.getElementById('task-metrics-summary').textContent = 'Programmatic OOP Reflection & Quality';
+
+    loadDocsSubtab(currentDocsSubtab);
   }
 }
 
-// Render active board tasks
 function renderBoard() {
   const columns = {
     TODO: document.getElementById('cards-todo'),
@@ -243,7 +255,6 @@ function renderBoard() {
   let allTags = new Set();
 
   tasks.forEach(task => {
-    // Only display active (non-deleted) tasks on Kanban Board
     if (task.is_deleted) return;
 
     if (task.task_specific_tags) {
@@ -366,14 +377,12 @@ function createTaskCard(task) {
   return card;
 }
 
-// Render Archived Tasks list view
 async function renderArchive() {
   const tbody = document.getElementById('archive-table-body');
   if (!tbody) return;
   tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 24px;">Loading archive records...</td></tr>';
 
   try {
-    // Query all tasks including deleted ones from server
     const response = await fetch('/api/tasks?include_deleted=true');
     if (!response.ok) throw new Error();
     const allTasks = await response.json();
@@ -406,7 +415,6 @@ async function renderArchive() {
         </td>
       `;
 
-      // Event bindings
       tr.querySelector('.btn-view-history').addEventListener('click', () => {
         openDetailDrawer(task.task_id);
       });
@@ -418,16 +426,15 @@ async function renderArchive() {
     });
   } catch (error) {
     console.error(error);
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load archive files.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load archive.</td></tr>';
   }
 }
 
 // ==========================================
-// 5. DRAWER LOGIC
+// 5. DETAIL DRAWER LOGIC
 // ==========================================
 
 async function openDetailDrawer(taskId) {
-  // Try to find in cache first, otherwise fall back
   let task = tasks.find(t => t.task_id === taskId);
   if (!task) {
     try {
@@ -439,11 +446,9 @@ async function openDetailDrawer(taskId) {
 
   activeTaskId = taskId;
 
-  // Toggle visual badge for seeds
   const coreBadge = document.getElementById('detail-core-badge');
   coreBadge.style.display = task.is_core ? 'inline-flex' : 'none';
 
-  // Toggle active delete/restore wording in detail footer
   const deleteBtn = document.getElementById('btn-delete-task');
   if (task.is_deleted) {
     deleteBtn.innerHTML = `
@@ -459,7 +464,6 @@ async function openDetailDrawer(taskId) {
     deleteBtn.className = 'btn btn-danger btn-full';
   }
 
-  // Bind values
   const priorityBadge = document.getElementById('detail-priority-badge');
   priorityBadge.textContent = task.priority;
   priorityBadge.className = `badge badge-priority-${task.priority}`;
@@ -498,7 +502,6 @@ async function openDetailDrawer(taskId) {
       '<p class="text-muted" style="font-size: 12px; font-style: italic; padding: 8px 0;">No bookmarks set yet.</p>';
   }
 
-  // Render Activity Log History Timeline
   renderDetailHistoryTimeline(taskId);
 
   document.getElementById('detail-drawer').classList.add('open');
@@ -512,7 +515,6 @@ function closeDetailDrawer() {
   }
 }
 
-// Renders historical timeline events for a task
 async function renderDetailHistoryTimeline(taskId) {
   const container = document.getElementById('detail-timeline-container');
   if (!container) return;
@@ -556,7 +558,6 @@ async function renderDetailHistoryTimeline(taskId) {
                 oldVal = oldVal ? formatDate(oldVal) : 'None';
                 newVal = newVal ? formatDate(newVal) : 'None';
               } else if (typeof oldVal === 'object' || Array.isArray(oldVal)) {
-                // Return counts or brief strings for lists
                 oldVal = Array.isArray(oldVal) ? `${oldVal.length} items` : 'Updated';
                 newVal = Array.isArray(newVal) ? `${newVal.length} items` : 'Updated';
               }
@@ -590,10 +591,6 @@ async function renderDetailHistoryTimeline(taskId) {
     container.appendChild(item);
   });
 }
-
-// -----------------
-// Sub-renders in Drawer
-// -----------------
 
 function renderDetailTags(task) {
   const container = document.getElementById('detail-tags-container');
@@ -677,7 +674,6 @@ function renderDetailBookmarks(task) {
   });
 }
 
-// Auto-save edited fields
 function handleDrawerFieldChange(field, val) {
   if (!activeTaskId) return;
   const task = tasks.find(t => t.task_id === activeTaskId);
@@ -690,22 +686,331 @@ function handleDrawerFieldChange(field, val) {
   if (field === 'status') payload.status = val;
   if (field === 'due_date') payload.due_date = val ? new Date(val).toISOString() : null;
 
-  // Send update to server
   apiUpdateTask(activeTaskId, payload).then(() => {
     renderDetailHistoryTimeline(activeTaskId);
   });
 }
 
 // ==========================================
-// 6. MODALS
+// 6. DEVELOPER DOCS & CODE HEALTH ACTIONS
 // ==========================================
 
-function openModal(id) {
-  document.getElementById(id).classList.add('open');
+function loadDocsSubtab(subtab) {
+  currentDocsSubtab = subtab;
+
+  // Toggle subnav header styling
+  document.querySelectorAll('.docs-subnav-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  const activeBtn = document.querySelector(`.docs-subnav-btn[data-subtab="${subtab}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  // Toggle panel visibility
+  document.querySelectorAll('.docs-subtab-panel').forEach(panel => {
+    panel.style.display = 'none';
+  });
+  const activePanel = document.getElementById(`panel-${subtab}`);
+  if (activePanel) activePanel.style.display = 'flex';
+
+  // Load specific tab data
+  if (subtab === 'explorer') {
+    loadClassExplorer();
+  } else if (subtab === 'api') {
+    loadApiReference();
+  } else if (subtab === 'health') {
+    loadCodeHealth();
+  } else if (subtab === 'guides') {
+    loadArchitectureGuides();
+  }
 }
 
-function closeModal(id) {
-  document.getElementById(id).classList.remove('open');
+async function loadClassExplorer() {
+  const container = document.getElementById('class-explorer-container');
+  if (!container) return;
+  
+  container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 24px;">Loading codebase files...</div>';
+
+  try {
+    const response = await fetch('/api/docs/metadata');
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+
+    container.innerHTML = '';
+    
+    data.files.forEach(file => {
+      file.classes.forEach(cls => {
+        const card = document.createElement('div');
+        card.className = 'class-card';
+
+        const docstringHTML = cls.docstring ? `
+          <div class="class-docstring">"${cls.docstring.trim()}"</div>
+        ` : '';
+
+        const methodsHTML = cls.methods.length > 0 ? `
+          <div class="class-methods-section">
+            <span class="class-methods-title">Methods</span>
+            <div class="methods-list">
+              ${cls.methods.map(m => `
+                <div class="method-item">
+                  <div class="method-item-header">
+                    <span class="method-signature">
+                      def <span class="method-name">${m.name}</span>(<span class="method-args">${m.args.join(', ')}</span>)
+                    </span>
+                    <span class="method-line-badge">Line ${m.line}</span>
+                  </div>
+                  ${m.docstring ? `<p class="method-doc">${m.docstring.trim()}</p>` : ''}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '<p class="text-muted" style="font-size:11px;">No class methods defined.</p>';
+
+        card.innerHTML = `
+          <div class="class-card-header">
+            <h3>${cls.name}</h3>
+            <span class="class-card-file">${file.file_name}</span>
+          </div>
+          ${docstringHTML}
+          ${methodsHTML}
+        `;
+
+        container.appendChild(card);
+      });
+    });
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; color: #f43f5e; padding: 24px;">Failed to reflect OOP codebase metadata.</div>';
+  }
+}
+
+async function loadApiReference() {
+  const tbody = document.getElementById('api-ref-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 24px;">Loading specifications...</td></tr>';
+
+  try {
+    const endpoints = [
+      { path: '/api/tasks', method: 'GET', desc: 'Queries active tasks list (or archived if include_deleted=true).' },
+      { path: '/api/tasks', method: 'POST', desc: 'Creates a new task. Requires a JSON body (title is mandatory) and logs a CREATED event.' },
+      { path: '/api/tasks/<id>', method: 'GET', desc: 'Queries a single task object by ID.' },
+      { path: '/api/tasks/<id>', method: 'PUT', desc: 'Updates task values. Diffs inputs against current data and auto-logs UPDATED logs detailing differences.' },
+      { path: '/api/tasks/<id>', method: 'DELETE', desc: 'Soft-deletes task (sets is_deleted = true) and logs a DELETED event.' },
+      { path: '/api/tasks/<id>/restore', method: 'POST', desc: 'Restores a soft-deleted task back to the Kanban board and logs a RESTORED event.' },
+      { path: '/api/tasks/<id>/history', method: 'GET', desc: 'Fetches the chronological audit timeline history logs for a task.' },
+      { path: '/api/reset', method: 'POST', desc: 'Wipes all database tasks and history logs, leaving a blank canvas.' },
+      { path: '/api/docs/metadata', method: 'GET', desc: 'Dynamically parses codebase modules (using python ast) and reflects OOP class metadata.' },
+      { path: '/api/docs/health', method: 'GET', desc: 'Compiles real-time AST syntax lint warnings and calculates a codebase quality score.' },
+      { path: '/api/docs/guides', method: 'GET', desc: 'Returns a list of available static guide filenames.' },
+      { path: '/api/docs/guides/<name>', method: 'GET', desc: 'Reads and retrieves guide contents.' }
+    ];
+
+    tbody.innerHTML = '';
+    endpoints.forEach(e => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="api-route-cell">${e.path}</td>
+        <td><span class="api-method-badge ${e.method}">${e.method}</span></td>
+        <td class="api-desc-cell">${e.desc}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load API Reference.</td></tr>';
+  }
+}
+
+async function loadCodeHealth() {
+  const tbody = document.getElementById('warnings-table-body');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 24px;">Analyzing code quality...</td></tr>';
+
+  try {
+    const response = await fetch('/api/docs/health');
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+
+    // 1. Update summary statistics
+    document.getElementById('health-stat-files').textContent = data.files_scanned || 0;
+    document.getElementById('health-stat-classes').textContent = data.stats.classes || 0;
+    document.getElementById('health-stat-methods').textContent = data.stats.methods || 0;
+    
+    const score = data.score || 0;
+    document.getElementById('health-score-text').textContent = `${score}%`;
+
+    // 2. Animate SVG circular ring
+    const fillCircle = document.getElementById('health-gauge-fill');
+    if (fillCircle) {
+      const circumference = 2 * Math.PI * 50; // r=50 -> ~314.16
+      const offset = circumference - (score / 100) * circumference;
+      fillCircle.style.strokeDashoffset = offset;
+      
+      // Dynamic coloring based on score
+      if (score >= 90) {
+        fillCircle.style.stroke = '#10b981'; // Green
+      } else if (score >= 70) {
+        fillCircle.style.stroke = '#fbbf24'; // Amber Gold
+      } else {
+        fillCircle.style.stroke = '#f43f5e'; // Red
+      }
+    }
+
+    // 3. Render warnings table
+    tbody.innerHTML = '';
+    const warnings = data.warnings || [];
+    
+    if (warnings.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="4" style="text-align: center; padding: 36px; color: var(--color-status-completed); font-weight: 500;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle; margin-right: 6px;"><polyline points="20 6 9 17 4 12"/></svg>
+            Excellent! Your codebase is 100% clean and documented.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    warnings.forEach(w => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="warning-file">${w.file}</td>
+        <td class="warning-scope">${w.scope}</td>
+        <td class="warning-issue">
+          <span class="warning-issue-badge ${w.severity}">${w.severity}</span>
+          ${w.issue}
+        </td>
+        <td>${w.line}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch (error) {
+    console.error(error);
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load codebase health audit report.</td></tr>';
+  }
+}
+
+async function loadArchitectureGuides() {
+  const container = document.getElementById('guides-list-container');
+  if (!container) return;
+
+  container.innerHTML = '<div style="padding: 12px; font-size: 12px;">Loading guides...</div>';
+
+  try {
+    const response = await fetch('/api/docs/guides');
+    if (!response.ok) throw new Error();
+    const guides = await response.json();
+
+    container.innerHTML = '';
+    
+    if (guides.length === 0) {
+      container.innerHTML = '<div class="text-muted" style="padding:12px;">No guides configured.</div>';
+      return;
+    }
+
+    guides.forEach((g, idx) => {
+      const btn = document.createElement('button');
+      btn.className = `guide-btn ${idx === 0 ? 'active' : ''}`;
+      btn.textContent = g.replace(/_/g, ' ');
+      btn.dataset.name = g;
+      
+      btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.guide-btn').forEach(b => b.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        fetchAndShowGuide(g);
+      });
+
+      container.appendChild(btn);
+    });
+
+    // Load first guide by default
+    if (guides.length > 0) {
+      fetchAndShowGuide(guides[0]);
+    }
+  } catch (error) {
+    console.error(error);
+    container.innerHTML = '<div style="color: #f43f5e; padding: 12px;">Error listing documentation guides.</div>';
+  }
+}
+
+async function fetchAndShowGuide(guideName) {
+  const pane = document.getElementById('guide-preview-body');
+  if (!pane) return;
+
+  pane.innerHTML = '<div style="text-align: center; padding: 64px 20px;">Fetching guide content...</div>';
+
+  try {
+    const response = await fetch(`/api/docs/guides/${guideName}`);
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+
+    // Parse Markdown content to HTML
+    pane.innerHTML = parseMarkdown(data.content);
+  } catch (error) {
+    console.error(error);
+    pane.innerHTML = '<div style="text-align: center; color: #f43f5e; padding: 64px 20px;">Failed to read guide.</div>';
+  }
+}
+
+// Client-side simple Markdown regex-to-html parser
+function parseMarkdown(md) {
+  if (!md) return '';
+  let html = md;
+
+  // Escape HTML elements to prevent scripting injections
+  html = html.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 1. Code blocks (Fenced pre blocks)
+  html = html.replace(/```([a-zA-Z0-9_\-]+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    return `<pre><code class="language-${lang || 'text'}">${code.trim()}</code></pre>`;
+  });
+
+  // 2. Inline Code block highlights
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  // 3. Headers (H3, H2, H1)
+  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+
+  // 4. Horizontal Rule lines
+  html = html.replace(/^---$/gim, '<hr>');
+
+  // 5. Bold markup
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // 6. Bullet lists
+  html = html.replace(/^\s*-\s+(.*$)/gim, '<li>$1</li>');
+  html = html.replace(/^\s*\*\s+(.*$)/gim, '<li>$1</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>)+/g, '<ul>$&</ul>');
+
+  // 7. Process paragraphs dynamically
+  const lines = html.split('\n');
+  let finalHtml = '';
+  let inPre = false;
+  let inUl = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (line.startsWith('<pre>')) inPre = true;
+    if (line.endsWith('</pre>')) inPre = false;
+    if (line.startsWith('<ul>')) inUl = true;
+    if (line.endsWith('</ul>')) inUl = false;
+
+    if (!line) {
+      finalHtml += '\n';
+      continue;
+    }
+
+    if (!inPre && !inUl && !line.startsWith('<h') && !line.startsWith('<hr') && !line.startsWith('<ul') && !line.startsWith('</ul') && !line.startsWith('<li')) {
+      finalHtml += `<p>${lines[i]}</p>\n`;
+    } else {
+      finalHtml += lines[i] + '\n';
+    }
+  }
+
+  return `<div class="guide-content">${finalHtml}</div>`;
 }
 
 // ==========================================
@@ -735,11 +1040,10 @@ function showToast(message) {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Initial fetch and draw
   await fetchTasks();
   renderView();
 
-  // --- View toggling ---
+  // --- View toggles ---
   document.getElementById('nav-all').addEventListener('click', (e) => {
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
     e.currentTarget.classList.add('active');
@@ -754,6 +1058,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.currentTarget.classList.add('active');
     currentView = 'ARCHIVE';
     renderView();
+  });
+
+  document.getElementById('nav-docs').addEventListener('click', (e) => {
+    document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
+    e.currentTarget.classList.add('active');
+    currentView = 'DOCS';
+    renderView();
+  });
+
+  // --- Sub-navigation clicks inside Dev Docs ---
+  document.querySelectorAll('.docs-subnav-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const subtab = e.currentTarget.dataset.subtab;
+      loadDocsSubtab(subtab);
+    });
   });
 
   // --- Priority filters ---
@@ -779,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // --- Reset database ---
   document.getElementById('btn-reset-db').addEventListener('click', () => {
-    if (confirm('Are you sure you want to reset the database? This will clear all tasks and history, and restore the initial Cheetah Conservation seed task.')) {
+    if (confirm('Are you sure you want to reset the database? This will clear all tasks and history, leaving a blank canvas.')) {
       apiResetDatabase();
     }
   });
@@ -852,7 +1171,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (!payload.task_specific_tags.includes(val)) {
         payload.task_specific_tags.push(val);
         apiUpdateTask(activeTaskId, payload).then(() => {
-          // Re-get from state
           const updatedTask = tasks.find(t => t.task_id === activeTaskId);
           renderDetailTags(updatedTask);
           renderDetailHistoryTimeline(activeTaskId);
@@ -934,17 +1252,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  // Detail Drawer Main Delete Action (handles soft-delete or restore)
+  // Drawer Main delete/restore button
   document.getElementById('btn-delete-task').addEventListener('click', () => {
     if (!activeTaskId) return;
     const task = tasks.find(t => t.task_id === activeTaskId);
     if (!task) return;
 
     if (task.is_deleted) {
-      // Restore task
       apiRestoreTask(activeTaskId);
     } else {
-      // Soft-delete task
       if (confirm(`Are you sure you want to delete task "${task.title}"?`)) {
         apiDeleteTask(activeTaskId);
       }
@@ -954,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // --- Modals Form Submissions ---
 
   // Task creation form
-  document.getElementById('task-modal').addEventListener('submit', (e) => {
+  document.getElementById('task-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const title = document.getElementById('form-title').value.trim();
     const priority = document.getElementById('form-priority').value;
