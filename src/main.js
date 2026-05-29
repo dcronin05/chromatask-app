@@ -333,8 +333,8 @@ const TASK_DISPLAY_CONFIG = [
 
 function syncDynamicFields(taskObjects) {
   const ignoredKeys = new Set([
-    'task_id', 'created_at', 'updated_at', 'is_deleted', 'deleted_at',
-    'attachment_type', 'media_metadata', 'app_features_placeholder'
+    'task_id', 'created_at', 'updated_at', 'completed_at', 'is_deleted', 'deleted_at',
+    'attachment_type'
   ]);
 
   taskObjects.forEach(task => {
@@ -342,7 +342,7 @@ function syncDynamicFields(taskObjects) {
       if (ignoredKeys.has(key)) return;
 
       const val = task[key];
-      // Skip nested objects to prevent [object Object] rendering
+      // Skip nested objects dynamically to prevent [object Object] rendering
       if (val !== null && typeof val === 'object' && !Array.isArray(val)) return;
       
       // Check if key is already in display config
