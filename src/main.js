@@ -8,6 +8,7 @@ let tasks = [];
 let activeTaskId = null;
 let currentView = 'DASHBOARD'; // 'DASHBOARD', 'ARCHIVE', or 'DOCS'
 let currentDocsSubtab = 'explorer'; // 'explorer', 'api', 'health', or 'guides'
+let currentDocsCommit = ''; // Selected commit hash for versioning (empty string means Live Code)
 let activeFilters = {
   search: '',
   priority: 'ALL',
@@ -780,7 +781,8 @@ async function loadClassExplorer() {
   container.innerHTML = '<div style="grid-column: 1/-1; text-align:center; padding: 24px;">Loading codebase files...</div>';
 
   try {
-    const response = await fetch('/api/docs/metadata');
+    const url = currentDocsCommit ? `/api/docs/metadata?commit=${currentDocsCommit}` : '/api/docs/metadata';
+    const response = await fetch(url);
     if (!response.ok) throw new Error();
     const data = await response.json();
 
@@ -876,7 +878,8 @@ async function loadCodeHealth() {
   tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 24px;">Analyzing code quality...</td></tr>';
 
   try {
-    const response = await fetch('/api/docs/health');
+    const url = currentDocsCommit ? `/api/docs/health?commit=${currentDocsCommit}` : '/api/docs/health';
+    const response = await fetch(url);
     if (!response.ok) throw new Error();
     const data = await response.json();
 
@@ -990,7 +993,8 @@ async function fetchAndShowGuide(guideName) {
   pane.innerHTML = '<div style="text-align: center; padding: 64px 20px;">Fetching guide content...</div>';
 
   try {
-    const response = await fetch(`/api/docs/guides/${guideName}`);
+    const url = currentDocsCommit ? `/api/docs/guides/${guideName}?commit=${currentDocsCommit}` : `/api/docs/guides/${guideName}`;
+    const response = await fetch(url);
     if (!response.ok) throw new Error();
     const data = await response.json();
 
@@ -999,6 +1003,36 @@ async function fetchAndShowGuide(guideName) {
   } catch (error) {
     console.error(error);
     pane.innerHTML = '<div style="text-align: center; color: #f43f5e; padding: 64px 20px;">Failed to read guide.</div>';
+  }
+}
+
+async function fetchDocsCommits() {
+  const select = document.getElementById('docs-version-select');
+  if (!select) return;
+  
+  try {
+    const response = await fetch('/api/docs/commits');
+    if (!response.ok) throw new Error();
+    const commits = await response.json();
+    
+    const currentVal = select.value;
+    
+    select.innerHTML = '<option value="">Live Code (Local Disk)</option>';
+    
+    commits.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.hash;
+      opt.textContent = `${c.hash} - ${c.subject} (${c.date})`;
+      select.appendChild(opt);
+    });
+    
+    if ([...select.options].some(o => o.value === currentVal)) {
+      select.value = currentVal;
+    } else {
+      currentDocsCommit = '';
+    }
+  } catch (err) {
+    console.error('Failed to fetch doc commits:', err);
   }
 }
 
@@ -1373,10 +1407,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderView();
   });
 
-  document.getElementById('nav-docs').addEventListener('click', (e) => {
+  document.getElementById('nav-docs').addEventListener('click', async (e) => {
     document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
     e.currentTarget.classList.add('active');
     currentView = 'DOCS';
+    await fetchDocsCommits();
     renderView();
   });
 
@@ -1387,6 +1422,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       loadDocsSubtab(subtab);
     });
   });
+
+  const selectEl = document.getElementById('docs-version-select');
+  if (selectEl) {
+    selectEl.addEventListener('change', (e) => {
+      currentDocsCommit = e.target.value;
+      loadDocsSubtab(currentDocsSubtab);
+    });
+  }
 
   // --- Priority filters ---
   document.querySelectorAll('.filter-btn').forEach(btn => {
