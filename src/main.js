@@ -341,13 +341,29 @@ function syncDynamicFields(taskObjects) {
     'attachment_type'
   ]);
 
+  // Scan all tasks to find keys that ever hold a non-null object (non-array)
+  taskObjects.forEach(task => {
+    Object.keys(task).forEach(key => {
+      const val = task[key];
+      if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+        ignoredKeys.add(key);
+      }
+    });
+  });
+
+  // Remove any dynamically registered entries that have now been marked as ignored
+  for (let i = TASK_DISPLAY_CONFIG.length - 1; i >= 0; i--) {
+    const entry = TASK_DISPLAY_CONFIG[i];
+    if (entry.isDynamic && ignoredKeys.has(entry.key)) {
+      TASK_DISPLAY_CONFIG.splice(i, 1);
+    }
+  }
+
   taskObjects.forEach(task => {
     Object.keys(task).forEach(key => {
       if (ignoredKeys.has(key)) return;
 
       const val = task[key];
-      // Skip nested objects dynamically to prevent [object Object] rendering
-      if (val !== null && typeof val === 'object' && !Array.isArray(val)) return;
       
       // Check if key is already in display config
       const exists = TASK_DISPLAY_CONFIG.some(c => c.key === key);
