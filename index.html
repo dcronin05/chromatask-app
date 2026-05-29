@@ -179,6 +179,7 @@
               <button class="docs-subnav-btn" data-subtab="api" id="subnav-api">API Reference</button>
               <button class="docs-subnav-btn" data-subtab="health" id="subnav-health">Code Health</button>
               <button class="docs-subnav-btn" data-subtab="guides" id="subnav-guides">Architecture Guides</button>
+              <button class="docs-subnav-btn" data-subtab="tests" id="subnav-tests">Test Suite</button>
             </div>
             <div class="version-selector-container">
               <label for="docs-version-select">Code Version:</label>
@@ -283,6 +284,76 @@
                 </div>
                 <div class="guide-preview-pane" id="guide-preview-body">
                   <div class="preview-placeholder">Select a guide from the sidebar to display developer documentation.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sub-tab: Test Suite -->
+            <div class="docs-subtab-panel" id="panel-tests" style="display: none;">
+              <div class="panel-header-row" style="flex-direction: row; justify-content: space-between; align-items: center; gap: 16px;">
+                <div>
+                  <h2>E2E Developer Test Suite</h2>
+                  <p>Programmatic execution of domain models, database context manager transactions, and task workflows.</p>
+                </div>
+                <button class="btn btn-primary" id="btn-run-tests" style="gap: 8px;">
+                  <span class="btn-text" id="btn-run-tests-text">Run All Tests</span>
+                  <span class="loading-spinner" id="tests-btn-spinner" style="display: none; border-left-color: white;"></span>
+                </button>
+              </div>
+
+              <div class="health-dashboard-grid test-dashboard-grid">
+                <!-- Left: Gauge ring -->
+                <div class="health-card gauge-card">
+                  <h3 class="card-title">Success Rate</h3>
+                  <div class="health-gauge-container">
+                    <svg class="health-gauge-svg" viewBox="0 0 120 120">
+                      <circle class="health-gauge-bg" cx="60" cy="60" r="50"></circle>
+                      <circle class="health-gauge-fill" id="tests-gauge-fill" cx="60" cy="60" r="50" style="stroke-dashoffset: 314.16; stroke: var(--color-success);"></circle>
+                    </svg>
+                    <div class="health-score-text" id="tests-score-text">0%</div>
+                  </div>
+                </div>
+
+                <!-- Right: Stats lists -->
+                <div class="health-card stats-card">
+                  <h3 class="card-title">Execution Stats</h3>
+                  <div class="stats-list">
+                    <div class="stat-item">
+                      <span class="stat-label">Total Suite Tests</span>
+                      <span class="stat-value" id="tests-stat-total">0</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Passed Checks</span>
+                      <span class="stat-value" id="tests-stat-passed" style="color: var(--color-success);">0</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Failed Checks</span>
+                      <span class="stat-value" id="tests-stat-failed" style="color: var(--color-danger);">0</span>
+                    </div>
+                    <div class="stat-item">
+                      <span class="stat-label">Total Duration</span>
+                      <span class="stat-value" id="tests-stat-duration">0.00s</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="health-card warnings-card" style="margin-top: 24px; flex: 1;">
+                <h3 class="card-title">Unit Test Executions</h3>
+                <div class="warnings-table-wrapper">
+                  <table class="archive-table tests-table">
+                    <thead>
+                      <tr>
+                        <th style="width: 130px;">Component</th>
+                        <th style="width: 320px;">Test Case Name</th>
+                        <th style="width: 100px;">Status</th>
+                        <th>Execution Logs / Failures</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tests-table-body">
+                      <!-- Dynamically populated test results -->
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
