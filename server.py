@@ -162,13 +162,27 @@ def reset_database() -> Any:
 # DEVELOPER DOCS & QUALITY API
 # ==========================================
 
+@app.route("/api/docs/commits", methods=["GET"])
+def get_docs_commits() -> Any:
+    """
+    Retrieves the list of recent Git commits for version selection.
+    """
+    try:
+        commits = code_doc_service.get_recent_commits()
+        return jsonify(commits), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/docs/metadata", methods=["GET"])
 def get_docs_metadata() -> Any:
     """
     Retrieves high-level metadata (classes, methods, file stats) for codebase files.
+    Supports an optional 'commit' query parameter to inspect historical revisions.
     """
+    commit_hash = request.args.get("commit")
     try:
-        report: Dict[str, Any] = code_doc_service.analyze_project(CODEBASE_FILES)
+        report: Dict[str, Any] = code_doc_service.analyze_project(CODEBASE_FILES, commit_hash)
         metadata: Dict[str, Any] = {
             "files": [
                 {
@@ -188,9 +202,11 @@ def get_docs_metadata() -> Any:
 def get_docs_health() -> Any:
     """
     Retrieves static analysis code health report details (score, stats, active warnings).
+    Supports an optional 'commit' query parameter to inspect historical revisions.
     """
+    commit_hash = request.args.get("commit")
     try:
-        report: Dict[str, Any] = code_doc_service.analyze_project(CODEBASE_FILES)
+        report: Dict[str, Any] = code_doc_service.analyze_project(CODEBASE_FILES, commit_hash)
         health: Dict[str, Any] = {
             "score": report["score"],
             "files_scanned": report["files_scanned"],
@@ -215,9 +231,11 @@ def get_guides_list() -> Any:
 def get_guide(name: str) -> Any:
     """
     Retrieves content of a specific system guide by name.
+    Supports an optional 'commit' query parameter to inspect historical revisions.
     """
+    commit_hash = request.args.get("commit")
     try:
-        content: str = code_doc_service.get_markdown_guide(name)
+        content: str = code_doc_service.get_markdown_guide(name, commit_hash)
         if not content:
             return jsonify({"error": "Guide not found"}), 404
         return jsonify({"name": name, "content": content}), 200
