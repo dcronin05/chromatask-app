@@ -858,6 +858,95 @@ body {
   gap: 10px;
 }
 
+.ai-insights-section {
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+}
+
+.ai-insights-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #a78bfa; /* Lavender purple */
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ai-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.ai-insight-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ai-insight-label {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ai-insight-value {
+  font-size: 13px;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+.json-viewer-container {
+  margin-top: 12px;
+  border-top: 1px solid rgba(124, 58, 237, 0.1);
+  padding-top: 12px;
+}
+
+.btn-toggle-json {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: #c084fc;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--transition-fast);
+}
+
+.btn-toggle-json:hover {
+  background: rgba(124, 58, 237, 0.2);
+  border-color: rgba(124, 58, 237, 0.3);
+  color: #d8b4fe;
+}
+
+.json-viewer {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-family: 'Fira Code', 'Courier New', monospace;
+  font-size: 11px;
+  color: #cbd5e1;
+  overflow-x: auto;
+  margin-top: 8px;
+  max-height: 250px;
+}
+
 .section-header-row {
   display: flex;
   justify-content: space-between;

@@ -33,7 +33,7 @@ Contains the active and archived tasks in the system:
   - `timestamp` (str): Format `[MM:SS]` or `[HH:MM:SS]`.
   - `label` (str): Bookmark name.
   - `note` (str | null): Optional description notes.
-* `app_features_placeholder` (dict): Placeholder dictionary for custom application features and metadata parameters.
+* `metadata` (dict): Extensible metadata dictionary for custom application features, AI-generated analysis records, and metadata parameters.
 
 ### B. The History Schema (Audit Log)
 Tracks every modification made to any task:

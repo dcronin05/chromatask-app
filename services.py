@@ -269,9 +269,9 @@ class AiTaskAnalyzerService:
         """Scans db tasks and triggers analysis on unanalyzed titles."""
         with DatabaseContext(self.db_file_path) as db:
             for task in db.tasks.get_all(include_deleted=True):
-                placeholder = task.app_features_placeholder or {}
-                has_changed = placeholder.get("ai_analyzed_title") != task.title
-                outdated_version = placeholder.get("ai_analyzed_version") != 2
+                meta = task.metadata or {}
+                has_changed = meta.get("ai_analyzed_title") != task.title
+                outdated_version = meta.get("ai_analyzed_version") != 2
                 if has_changed or outdated_version:
                     self.analyze_task(task, db)
                     db.tasks.update(task)
@@ -469,17 +469,35 @@ class AiTaskAnalyzerService:
         """Main orchestrator parsing a task's title and applying fields changes."""
         title_lower = task.title.lower()
         update_data: Dict[str, Any] = {}
+        
+        # 1. Local analysis dynamically populates the database fields
+        self._apply_heuristic_results(task, title_lower, update_data)
+        
+        # 2. Cloud AI runs to perform analysis and stores raw result under metadata["ai_data"]
         api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         gemini_result = self._call_gemini_api(task.title, api_key) if api_key else None
+        
         if gemini_result:
-            self._apply_gemini_results(task, gemini_result, update_data)
+            ai_data = gemini_result
         else:
-            self._apply_heuristic_results(task, title_lower, update_data)
-        placeholder = task.app_features_placeholder or {}
-        placeholder["ai_analyzed_title"] = update_data.get("title", task.title)
-        placeholder["ai_analyzed"] = True
-        placeholder["ai_analyzed_version"] = 2
-        task.app_features_placeholder = placeholder
+            # Local fallback of ai data for future analysis/interpretation
+            ai_data = {
+                "priority": update_data.get("priority", task.priority),
+                "tags": update_data.get("task_specific_tags", task.task_specific_tags),
+                "due_date": update_data.get("due_date", task.due_date),
+                "description": update_data.get("description", task.description),
+                "attachment_type": update_data.get("attachment_type", task.attachment_type),
+                "media_metadata": update_data.get("media_metadata", task.media_metadata),
+                "curated_video_bookmarks": update_data.get("curated_video_bookmarks", task.curated_video_bookmarks)
+            }
+            
+        meta = task.metadata or {}
+        meta["ai_analyzed_title"] = update_data.get("title", task.title)
+        meta["ai_analyzed"] = True
+        meta["ai_analyzed_version"] = 2
+        meta["ai_data"] = ai_data
+        task.metadata = meta
+        
         if update_data:
             diffs = task.update_fields(update_data)
             if diffs:

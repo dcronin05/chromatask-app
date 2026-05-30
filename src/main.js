@@ -1036,10 +1036,89 @@ async function openDetailDrawer(taskId) {
     }
   }
 
+  // Render AI Insights Section
+  renderAiInsightsSection(task);
+
   renderDetailHistoryTimeline(taskId);
 
   const drawer = document.getElementById('detail-drawer');
   if (drawer) drawer.classList.add('open');
+}
+
+function renderAiInsightsSection(task) {
+  const container = document.getElementById('drawer-ai-insights-section');
+  if (!container) return;
+
+  const meta = task.metadata || task.app_features_placeholder || {};
+  const aiData = meta.ai_data;
+  if (!aiData) {
+    container.style.display = 'none';
+    container.innerHTML = '';
+    return;
+  }
+
+  container.style.display = 'flex';
+
+  const pLabel = aiData.priority || 'N/A';
+  const tagsStr = Array.isArray(aiData.tags) && aiData.tags.length > 0
+    ? aiData.tags.map(t => `#${t}`).join(' ')
+    : 'None';
+  const dueStr = aiData.due_date ? formatDate(aiData.due_date) : 'None';
+  const descStr = aiData.description || 'None';
+
+  container.innerHTML = `
+    <div class="ai-insights-header">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform var(--transition-normal);">
+        <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>
+      </svg>
+      <span>AI Interpretation insights</span>
+    </div>
+    
+    <div class="ai-insights-grid">
+      <div class="ai-insight-card">
+        <span class="ai-insight-label">AI Priority</span>
+        <span class="ai-insight-value"><span class="badge badge-priority-${pLabel}">${pLabel}</span></span>
+      </div>
+      <div class="ai-insight-card">
+        <span class="ai-insight-label">AI Tags</span>
+        <span class="ai-insight-value" style="color: var(--color-text-secondary); font-size: 11px;">${tagsStr}</span>
+      </div>
+      <div class="ai-insight-card">
+        <span class="ai-insight-label">AI Due Date</span>
+        <span class="ai-insight-value">${dueStr}</span>
+      </div>
+    </div>
+    
+    <div class="ai-insight-card" style="margin-top: 8px;">
+      <span class="ai-insight-label">AI Task Summary</span>
+      <span class="ai-insight-value" style="font-style: italic; color: var(--color-text-secondary); line-height: 1.4;">"${descStr}"</span>
+    </div>
+
+    <div class="json-viewer-container">
+      <button class="btn-toggle-json" id="btn-toggle-raw-json">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transition: transform var(--transition-fast);">
+          <polyline points="4 17 10 11 4 5"/>
+          <line x1="12" y1="19" x2="20" y2="19"/>
+        </svg>
+        <span>View Raw AI Response</span>
+      </button>
+      <pre class="json-viewer" id="raw-ai-json" style="display: none;"></pre>
+    </div>
+  `;
+
+  const toggleBtn = container.querySelector('#btn-toggle-raw-json');
+  const jsonPre = container.querySelector('#raw-ai-json');
+  toggleBtn.addEventListener('click', () => {
+    const isHidden = jsonPre.style.display === 'none';
+    jsonPre.style.display = isHidden ? 'block' : 'none';
+    jsonPre.textContent = JSON.stringify(aiData, null, 2);
+    
+    const btnText = toggleBtn.querySelector('span');
+    btnText.textContent = isHidden ? 'Hide Raw AI Response' : 'View Raw AI Response';
+    
+    const svg = toggleBtn.querySelector('svg');
+    svg.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+  });
 }
 
 function closeDetailDrawer() {

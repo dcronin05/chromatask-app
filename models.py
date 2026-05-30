@@ -48,7 +48,7 @@ class Task(Entity):
                  media_metadata: Optional[Dict[str, Any]] = None,
                  task_specific_tags: Optional[List[str]] = None, 
                  curated_video_bookmarks: Optional[List[Dict[str, Any]]] = None, 
-                 app_features_placeholder: Optional[Dict[str, Any]] = None) -> None:
+                 metadata: Optional[Dict[str, Any]] = None) -> None:
         """
         Initializes a task with title, priority, status, and related co-watching metadata.
         """
@@ -67,7 +67,7 @@ class Task(Entity):
         self.media_metadata: Optional[Dict[str, Any]] = media_metadata
         self.task_specific_tags: List[str] = task_specific_tags or []
         self.curated_video_bookmarks: List[Dict[str, Any]] = curated_video_bookmarks or []
-        self.app_features_placeholder: Dict[str, Any] = app_features_placeholder or {}
+        self.metadata: Dict[str, Any] = metadata or {}
 
     @property
     def task_id(self) -> str:
@@ -97,7 +97,7 @@ class Task(Entity):
             "media_metadata": self.media_metadata,
             "task_specific_tags": self.task_specific_tags,
             "curated_video_bookmarks": self.curated_video_bookmarks,
-            "app_features_placeholder": self.app_features_placeholder
+            "metadata": self.metadata
         }
 
     @classmethod
@@ -122,7 +122,7 @@ class Task(Entity):
             media_metadata=data.get("media_metadata"),
             task_specific_tags=data.get("task_specific_tags", []),
             curated_video_bookmarks=data.get("curated_video_bookmarks", []),
-            app_features_placeholder=data.get("app_features_placeholder", {})
+            metadata=data.get("metadata") or data.get("app_features_placeholder", {})
         )
 
     def update_fields(self, new_data: Dict[str, Any]) -> List[Dict[str, Any]]:
