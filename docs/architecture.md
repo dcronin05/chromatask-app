@@ -116,9 +116,9 @@ To prevent page reloads or server restarts from resetting the user's active cont
 ### 📊 Codebase Structural Summary
 - **Scanned Modules**: 8 files
 - **Detected Classes**: 18 classes
-- **Total Methods/Functions**: 185 methods
-- **Lines of Code**: 8195 lines (Comments: 298 lines)
+- **Total Methods/Functions**: 186 methods
+- **Lines of Code**: 8225 lines (Comments: 298 lines)
 
-*Documentation compiled from Git HEAD:* `a969372` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `efb904d` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_API_REFERENCE_END -->
 

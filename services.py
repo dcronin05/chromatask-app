@@ -39,7 +39,7 @@ class TaskService:
             task = Task.from_dict(task_data)
             
             # Run instant AI analysis pass before saving
-            self.ai_analyzer.analyze_task(task, db)
+            self.ai_analyzer.analyze_task(task, db, during_creation=True)
             
             # Save task
             db.tasks.add(task)
@@ -269,7 +269,9 @@ class AiTaskAnalyzerService:
         with DatabaseContext(self.db_file_path) as db:
             for task in db.tasks.get_all(include_deleted=True):
                 placeholder = task.app_features_placeholder or {}
-                if placeholder.get("ai_analyzed_title") != task.title:
+                has_changed = placeholder.get("ai_analyzed_title") != task.title
+                outdated_version = placeholder.get("ai_analyzed_version") != 2
+                if has_changed or outdated_version:
                     self.analyze_task(task, db)
                     db.tasks.update(task)
 
@@ -362,44 +364,72 @@ class AiTaskAnalyzerService:
             desc_parts.append("Attached CCF cheetah co-watch video.")
         return " ".join(desc_parts)
 
-    def analyze_task(self, task: Task, db: DatabaseContext) -> bool:
+    def _capitalize_sentences(self, text: str) -> str:
+        """Capitalizes the first letter of each sentence in a text string."""
+        if not text:
+            return ""
+        sentences = re.split(r'(\s*[\.\!\?]\s*)', text)
+        result = []
+        for part in sentences:
+            if re.match(r'^\s*[\.\!\?]\s*$', part):
+                result.append(part)
+            else:
+                stripped = part.lstrip()
+                if stripped:
+                    leading_whitespace = part[:len(part)-len(stripped)]
+                    capitalized = stripped[0].upper() + stripped[1:]
+                    result.append(leading_whitespace + capitalized)
+                else:
+                    result.append(part)
+        return "".join(result)
+
+    def analyze_task(self, task: Task, db: DatabaseContext, during_creation: bool = False) -> bool:
         """Main orchestrator parsing a task's title and applying fields changes."""
         title_lower = task.title.lower()
         update_data: Dict[str, Any] = {}
-        
+
+        cap_title = self._capitalize_sentences(task.title)
+        if cap_title != task.title:
+            update_data["title"] = cap_title
+
         priority = self._parse_priority(title_lower)
         if priority and task.priority != priority:
             update_data["priority"] = priority
-            
+
         tags = self._parse_tags(title_lower, task.task_specific_tags)
         if tags != task.task_specific_tags:
             update_data["task_specific_tags"] = tags
-            
+
         due = self._parse_due_date(title_lower)
         if due and task.due_date != due:
             update_data["due_date"] = due
-            
+
         att_type, media, bookmarks = self._parse_media_and_bookmarks(title_lower)
         if att_type and not task.attachment_type:
             update_data["attachment_type"] = att_type
             update_data["media_metadata"] = media
             update_data["curated_video_bookmarks"] = bookmarks
-            
+
         if not task.description or not task.description.strip():
-            if update_data:
-                desc = self._generate_description(task.title, update_data)
-                update_data["description"] = desc
-            
+            desc = self._generate_description(update_data.get("title", task.title), update_data)
+            update_data["description"] = desc
+        elif task.description:
+            cap_desc = self._capitalize_sentences(task.description)
+            if cap_desc != task.description:
+                update_data["description"] = cap_desc
+
         placeholder = task.app_features_placeholder or {}
-        placeholder["ai_analyzed_title"] = task.title
+        placeholder["ai_analyzed_title"] = update_data.get("title", task.title)
         placeholder["ai_analyzed"] = True
+        placeholder["ai_analyzed_version"] = 2
         task.app_features_placeholder = placeholder
-        
+
         if update_data:
             diffs = task.update_fields(update_data)
             if diffs:
-                log = HistoryLog(task_id=task.task_id, action="UPDATED", details={"changes": diffs, "ai_processed": True})
-                db.history.add(log)
+                if not during_creation:
+                    log = HistoryLog(task_id=task.task_id, action="UPDATED", details={"changes": diffs, "ai_processed": True})
+                    db.history.add(log)
                 return True
         return False
 

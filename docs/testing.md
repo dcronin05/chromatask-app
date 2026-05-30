@@ -78,6 +78,6 @@ The Dev Docs & Health console is backed by the following server routes:
 - **Unit Tests Success Rate**: **0%** (0/38 Passed, 0 Failed)
 - **Test Execution Duration**: 0.0s
 
-*Documentation compiled from Git HEAD:* `a969372` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `efb904d` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_HEALTH_SCORECARD_END -->
 
