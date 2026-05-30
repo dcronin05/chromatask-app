@@ -459,6 +459,23 @@ async function apiDeleteTask(taskId) {
   }
 }
 
+async function apiDeleteTaskPermanently(taskId) {
+  try {
+    const response = await fetch(`/api/tasks/${taskId}/permanent`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Failed to delete task permanently');
+    showToast('Task permanently purged from database.');
+    closeDetailDrawer();
+    await fetchTasks();
+    renderView();
+  } catch (error) {
+    console.error(error);
+    showToast('Error purging task permanently.');
+  }
+}
+
+
 async function apiRestoreTask(taskId) {
   try {
     const response = await fetch(`/api/tasks/${taskId}/restore`, {
@@ -887,6 +904,7 @@ function renderArchive() {
       <td class="archive-action-cell">
         <button class="btn btn-secondary btn-sm btn-view-history" data-id="${task.task_id}">Timeline</button>
         <button class="btn btn-primary btn-sm btn-restore-task" data-id="${task.task_id}">Restore</button>
+        <button class="btn btn-danger btn-sm btn-delete-permanent" data-id="${task.task_id}">Purge</button>
       </td>
     `;
 
@@ -895,6 +913,11 @@ function renderArchive() {
     });
     tr.querySelector('.btn-restore-task').addEventListener('click', () => {
       apiRestoreTask(task.task_id);
+    });
+    tr.querySelector('.btn-delete-permanent').addEventListener('click', () => {
+      if (confirm(`Are you absolutely sure you want to permanently delete task "${task.title}"? This will purge it and all of its history logs forever.`)) {
+        apiDeleteTaskPermanently(task.task_id);
+      }
     });
     tbody.appendChild(tr);
   });
@@ -962,6 +985,7 @@ async function openDetailDrawer(taskId) {
   if (coreBadge) coreBadge.style.display = task.is_core ? 'inline-flex' : 'none';
 
   const deleteBtn = document.getElementById('btn-delete-task');
+  const deletePermanentBtn = document.getElementById('btn-delete-task-permanent');
   if (deleteBtn) {
     if (task.is_deleted) {
       deleteBtn.innerHTML = `
@@ -969,12 +993,14 @@ async function openDetailDrawer(taskId) {
         <span>Restore Task</span>
       `;
       deleteBtn.className = 'btn btn-primary btn-full';
+      if (deletePermanentBtn) deletePermanentBtn.style.display = 'inline-flex';
     } else {
       deleteBtn.innerHTML = `
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
         <span>Delete Task</span>
       `;
       deleteBtn.className = 'btn btn-danger btn-full';
+      if (deletePermanentBtn) deletePermanentBtn.style.display = 'none';
     }
   }
 
@@ -2399,6 +2425,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (confirm(`Are you sure you want to delete task "${task.title}"?`)) {
         apiDeleteTask(activeTaskId);
       }
+    }
+  });
+
+  document.getElementById('btn-delete-task-permanent').addEventListener('click', () => {
+    if (!activeTaskId) return;
+    const task = tasks.find(t => t.task_id === activeTaskId);
+    if (!task) return;
+    if (confirm(`Are you absolutely sure you want to permanently delete task "${task.title}"? This will purge it and all of its history logs forever.`)) {
+      apiDeleteTaskPermanently(activeTaskId);
     }
   });
 

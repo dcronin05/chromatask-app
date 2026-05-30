@@ -62,6 +62,10 @@ The Dev Docs & Health console is backed by the following server routes:
   - Retrieves the latest compiled test execution stats and results.
 - **Metrics Polling**: `GET /api/docs/tests/metrics/<metric_name>`
   - Allows polling specific execution parameters individually: `total`, `passed`, `failed`, `success_rate`, `duration`, or `timestamp`.
+- **Endpoints Discovery**: `GET /api/docs/endpoints`
+  - Returns a dynamically compiled JSON list of all REST routes, HTTP verbs, and descriptions extracted from `server.py` using AST.
+- **Sync Documentation**: `POST /api/docs/sync`
+  - Triggers a manual synchronization of dynamic documentation placeholders.
 
 ---
 
@@ -71,9 +75,9 @@ The Dev Docs & Health console is backed by the following server routes:
 ### 🛡️ Code Health Scorecard
 - **Code Quality Score**: **100%**
 - **Active Linter Warnings**: 1 active warnings
-- **Unit Tests Success Rate**: **100%** (34/34 Passed, 0 Failed)
-- **Test Execution Duration**: 0.4951s
+- **Unit Tests Success Rate**: **100%** (37/37 Passed, 0 Failed)
+- **Test Execution Duration**: 0.3127s
 
-*Documentation compiled from Git HEAD:* `ae12d0d` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `9ddcf80` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_HEALTH_SCORECARD_END -->
 

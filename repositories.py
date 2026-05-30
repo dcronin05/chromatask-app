@@ -83,6 +83,13 @@ class JSONTaskRepository(BaseRepository):
         if task:
             task.soft_delete()
 
+    def delete_permanently(self, task_id: str) -> None:
+        """
+        Permanently removes the task matching the given task identifier from memory.
+        """
+        if task_id in self._tasks:
+            del self._tasks[task_id]
+
 
 class JSONHistoryRepository(BaseRepository):
     """

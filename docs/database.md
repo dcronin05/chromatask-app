@@ -33,16 +33,18 @@ Contains the active and archived tasks in the system:
   - `timestamp` (str): Format `[MM:SS]` or `[HH:MM:SS]`.
   - `label` (str): Bookmark name.
   - `note` (str | null): Optional description notes.
+* `app_features_placeholder` (dict): Placeholder dictionary for custom application features and metadata parameters.
 
 ### B. The History Schema (Audit Log)
 Tracks every modification made to any task:
 * `history_id` (str): Unique UUID.
 * `task_id` (str): Reference to the modified task.
-* `action` (str): Type of event (`CREATED`, `UPDATED`, `DELETED`, `RESTORED`).
+* `action` (str): Type of event (`CREATED`, `UPDATED`, `DELETED`, `RESTORED`, `ROLLBACK`).
 * `timestamp` (str): ISO 8601 log timestamp.
 * `details` (dict): Event metadata:
   - For `CREATED` and `DELETED` events: Contains `{"title": task_title}`.
   - For `UPDATED` events: Contains `{"changes": [{"field": name, "old": old_value, "new": new_value}]}` mapping exactly what properties were changed.
+  - For `ROLLBACK` events: Contains `{"rollback_to_history_id": history_id, "changes": [{"field": name, "old": old_value, "new": new_value}]}` detailing the reverted changes.
 
 ---
 

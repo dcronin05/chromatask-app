@@ -1,5 +1,8 @@
 import datetime
-from typing import Any, Dict, List, Optional
+import re
+import threading
+import time
+from typing import Any, Dict, List, Optional, Tuple
 from repositories import DatabaseContext
 from models import Task, HistoryLog
 
@@ -13,6 +16,7 @@ class TaskService:
         Initializes the TaskService with a database file path.
         """
         self.db_file_path: str = db_file_path
+        self.ai_analyzer: "AiTaskAnalyzerService" = AiTaskAnalyzerService(db_file_path)
 
     def get_all_tasks(self, include_deleted: bool = False) -> List[Dict[str, Any]]:
         """Retrieves all active or archived tasks, sorted by creation date."""
@@ -29,10 +33,13 @@ class TaskService:
             return task.to_dict() if task else None
 
     def create_task(self, task_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Creates a new task and logs the creation event."""
+        """Creates a new task, runs instant AI analysis, and logs the creation event."""
         with DatabaseContext(self.db_file_path) as db:
             # Instantiate Entity
             task = Task.from_dict(task_data)
+            
+            # Run instant AI analysis pass before saving
+            self.ai_analyzer.analyze_task(task, db)
             
             # Save task
             db.tasks.add(task)
@@ -48,16 +55,22 @@ class TaskService:
             return task.to_dict()
 
     def update_task(self, task_id: str, update_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Updates a task, diffs fields, and logs a detailed update history event."""
+        """Updates a task, diffs fields, triggers AI analysis on title changes, and logs history."""
         with DatabaseContext(self.db_file_path) as db:
             task = db.tasks.get(task_id)
             if not task:
                 raise ValueError(f"Task with ID {task_id} not found.")
 
+            # Detect title changes to trigger AI re-analysis
+            title_changing = "title" in update_data and update_data["title"] != task.title
+
             # Perform update and retrieve list of changes
             diffs = task.update_fields(update_data)
             
-            if diffs:
+            if title_changing:
+                self.ai_analyzer.analyze_task(task, db)
+            
+            if diffs or title_changing:
                 # Save task changes
                 db.tasks.update(task)
                 
@@ -211,3 +224,182 @@ class TaskService:
             
             # DatabaseContext commits on exit automatically
             return True
+
+    def delete_task_permanently(self, task_id: str) -> None:
+        """Permanently deletes a task and all history events associated with it."""
+        with DatabaseContext(self.db_file_path) as db:
+            db.tasks.delete_permanently(task_id)
+            db._history[:] = [h for h in db._history if h.task_id != task_id]
+
+
+class AiTaskAnalyzerService:
+    """
+    Background analyzer service that monitors tasks for title updates
+    and dynamically populates task metadata using keyword heuristics.
+    """
+    def __init__(self, db_file_path: str = "db.json") -> None:
+        """Initializes the background AI analyzer service."""
+        self.db_file_path: str = db_file_path
+        self.running: bool = False
+        self.thread: Optional[threading.Thread] = None
+
+    def start(self) -> None:
+        """Launches the background daemon thread loop."""
+        self.running = True
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+
+    def stop(self) -> None:
+        """Stops the background loop thread execution."""
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=1.0)
+
+    def _run_loop(self) -> None:
+        """Executes the loop checking for pending tasks every 2 seconds."""
+        while self.running:
+            try:
+                self.analyze_pending_tasks()
+            except Exception as e:
+                print(f"Error in AiTaskAnalyzerService background loop: {e}")
+            time.sleep(2)
+
+    def analyze_pending_tasks(self) -> None:
+        """Scans db tasks and triggers analysis on unanalyzed titles."""
+        with DatabaseContext(self.db_file_path) as db:
+            for task in db.tasks.get_all(include_deleted=True):
+                placeholder = task.app_features_placeholder or {}
+                if placeholder.get("ai_analyzed_title") != task.title:
+                    self.analyze_task(task, db)
+                    db.tasks.update(task)
+
+    def _parse_priority(self, title_lower: str) -> Optional[str]:
+        """Maps urgency keywords found in titles to priority values."""
+        if any(w in title_lower for w in ["urgent", "asap", "immediate", "critical", "blocking", "emergency"]):
+            return "HIGH"
+        if any(w in title_lower for w in ["low priority", "later", "backlog", "low", "minor", "someday", "optional"]):
+            return "LOW"
+        if any(w in title_lower for w in ["medium", "normal", "moderate", "routine"]):
+            return "MEDIUM"
+        return None
+
+    def _parse_tags(self, title_lower: str, current_tags: List[str]) -> List[str]:
+        """Detects keyword markers and hashtags to build task tags list."""
+        new_tags = list(current_tags)
+        if any(w in title_lower for w in ["cheetah", "ccf", "wildlife", "zoology", "animal"]):
+            for t in ["Wildlife Conservation", "Zoology", "CCF"]:
+                if t not in new_tags:
+                    new_tags.append(t)
+        if any(w in title_lower for w in ["plex", "dexter", "backup", "tower", "server"]):
+            for t in ["Plex", "Backup", "Server"]:
+                if t not in new_tags:
+                    new_tags.append(t)
+        if any(w in title_lower for w in ["caffeine", "coffee", "drink", "tea"]):
+            for t in ["Beverage", "Caffeine"]:
+                if t not in new_tags:
+                    new_tags.append(t)
+        if any(w in title_lower for w in ["test", "unittest", "linter", "docs"]):
+            for t in ["Testing", "DevDocs"]:
+                if t not in new_tags:
+                    new_tags.append(t)
+        
+        hashtags = re.findall(r"#(\w+)", title_lower)
+        for tag in hashtags:
+            formatted_tag = tag.capitalize()
+            if formatted_tag not in new_tags:
+                new_tags.append(formatted_tag)
+        return new_tags
+
+    def _parse_due_date(self, title_lower: str) -> Optional[str]:
+        """Identifies relative date expressions and converts them to ISO deadlines."""
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if "today" in title_lower:
+            return now.replace(hour=18, minute=0, second=0, microsecond=0).isoformat()
+        if "tomorrow" in title_lower:
+            tomorrow = now + datetime.timedelta(days=1)
+            return tomorrow.replace(hour=18, minute=0, second=0, microsecond=0).isoformat()
+        if "next week" in title_lower:
+            next_w = now + datetime.timedelta(days=7)
+            return next_w.replace(hour=18, minute=0, second=0, microsecond=0).isoformat()
+        return None
+
+    def _parse_media_and_bookmarks(self, title_lower: str) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
+        """Auto-attaches media metadata and timestamps for video co-watching tasks."""
+        if "cheetah" in title_lower or "lindsay nikole" in title_lower:
+            media = {
+                "platform": "YouTube",
+                "original_url": "https://youtu.be/TStDUEBNGCM?si=5cSDsE9M9U8vYaeH",
+                "video_id": "TStDUEBNGCM",
+                "title": "Saving Cheetahs | Returning to Cheetah Conservation Fund | Lindsay Nikole",
+                "creator_or_channel": "Lindsay Nikole",
+                "publish_date": "2025-08-28",
+                "duration_iso_8601": "PT46M1S",
+                "duration_seconds": 2761,
+                "thumbnail_url": "https://i.ytimg.com/vi/TStDUEBNGCM/maxresdefault.jpg",
+                "metrics_at_creation": {"view_count": 138052, "like_count": 15092}
+            }
+            bookmarks = [
+                {"timestamp": "[00:04:55]", "label": "Interview with Dr. Laurie Marker (CCF Founder)", "note": "Discusses wild population."},
+                {"timestamp": "[00:06:15]", "label": "The Livestock Guarding Dog Program", "note": "Livestock guarding dogs program details."},
+                {"timestamp": "[00:08:25]", "label": "Three Core Rules of Livestock Management", "note": "Rules for local farmers."},
+                {"timestamp": "[00:19:25]", "label": "Cheetah Meat Prep & 'Predator Powder'", "note": "Feeding orphan cheetahs cc."},
+                {"timestamp": "[00:24:45]", "label": "Release Candidates Criteria", "note": "Atango and Zephyr release suitability."}
+            ]
+            return "VIDEO_LINK", media, bookmarks
+        return None, None, None
+
+    def _generate_description(self, title: str, update_data: Dict[str, Any]) -> str:
+        """Synthesizes a descriptive text summary explaining the AI configurations applied."""
+        desc_parts = [f"AI-generated details for: '{title}'."]
+        if "priority" in update_data:
+            desc_parts.append(f"Priority evaluated as {update_data['priority']}.")
+        if "task_specific_tags" in update_data:
+            tags_str = ", ".join(update_data["task_specific_tags"])
+            desc_parts.append(f"Auto-tagged: {tags_str}.")
+        if "due_date" in update_data:
+            desc_parts.append("Set due date calendar reminder.")
+        if "media_metadata" in update_data:
+            desc_parts.append("Attached CCF cheetah co-watch video.")
+        return " ".join(desc_parts)
+
+    def analyze_task(self, task: Task, db: DatabaseContext) -> bool:
+        """Main orchestrator parsing a task's title and applying fields changes."""
+        title_lower = task.title.lower()
+        update_data: Dict[str, Any] = {}
+        
+        priority = self._parse_priority(title_lower)
+        if priority and task.priority != priority:
+            update_data["priority"] = priority
+            
+        tags = self._parse_tags(title_lower, task.task_specific_tags)
+        if tags != task.task_specific_tags:
+            update_data["task_specific_tags"] = tags
+            
+        due = self._parse_due_date(title_lower)
+        if due and task.due_date != due:
+            update_data["due_date"] = due
+            
+        att_type, media, bookmarks = self._parse_media_and_bookmarks(title_lower)
+        if att_type and not task.attachment_type:
+            update_data["attachment_type"] = att_type
+            update_data["media_metadata"] = media
+            update_data["curated_video_bookmarks"] = bookmarks
+            
+        if not task.description or not task.description.strip():
+            if update_data:
+                desc = self._generate_description(task.title, update_data)
+                update_data["description"] = desc
+            
+        placeholder = task.app_features_placeholder or {}
+        placeholder["ai_analyzed_title"] = task.title
+        placeholder["ai_analyzed"] = True
+        task.app_features_placeholder = placeholder
+        
+        if update_data:
+            diffs = task.update_fields(update_data)
+            if diffs:
+                log = HistoryLog(task_id=task.task_id, action="UPDATED", details={"changes": diffs, "ai_processed": True})
+                db.history.add(log)
+                return True
+        return False
+

@@ -532,13 +532,17 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertIn("time_travel", guides)
         self.assertIn("testing", guides)
 
-        # Test specific guide retrieval (e.g. database guide)
+        # Test specific guide retrieval (e.g. database guide) and that it contains app_features_placeholder & ROLLBACK
         guide_resp = self.client.get("/api/docs/guides/database")
         self.assertEqual(guide_resp.status_code, 200)
-        self.assertEqual(guide_resp.get_json()["name"], "database")
-        self.assertIn("content", guide_resp.get_json())
+        db_data = guide_resp.get_json()
+        self.assertEqual(db_data["name"], "database")
+        self.assertIn("content", db_data)
+        db_content = db_data["content"]
+        self.assertIn("app_features_placeholder", db_content)
+        self.assertIn("ROLLBACK", db_content)
 
-        # Test architecture guide contains Display Config & Dynamic Schema Engine documentation
+        # Test architecture guide contains Display Config, Dynamic Schema Engine, and AST API Route Parser documentation
         arch_resp = self.client.get("/api/docs/guides/architecture")
         self.assertEqual(arch_resp.status_code, 200)
         arch_content = arch_resp.get_json()["content"]
@@ -548,8 +552,9 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertIn("localStorage", arch_content)
         self.assertIn("btn-toggle-sidebar", arch_content)
         self.assertIn("nav-counter", arch_content)
+        self.assertIn("AST API Route Parser", arch_content)
 
-        # Test testing guide contains JSDoc comment/function length thresholds and CSS/HTML audits
+        # Test testing guide contains JSDoc comment/function length thresholds, CSS/HTML audits, and endpoint routes documentation
         test_resp = self.client.get("/api/docs/guides/testing")
         self.assertEqual(test_resp.status_code, 200)
         test_content = test_resp.get_json()["content"]
@@ -557,6 +562,8 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertIn("150 lines", test_content)
         self.assertIn("60 lines", test_content)
         self.assertIn("CSSCodeAnalyzer", test_content)
+        self.assertIn("/api/docs/endpoints", test_content)
+        self.assertIn("/api/docs/sync", test_content)
 
         # Test time travel guide contains list diff and null value timeline logs formatting checks
         tt_resp = self.client.get("/api/docs/guides/time_travel")
@@ -653,6 +660,68 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertIn("/api/tasks", paths)
         self.assertIn("/api/docs/endpoints", paths)
         self.assertIn("/api/docs/health", paths)
+
+    def test_permanent_deletion_endpoint(self) -> None:
+        """Verifies DELETE /api/tasks/<id>/permanent purges task and history logs."""
+        create_resp = self.client.post("/api/tasks", json={"title": "Temp Task"})
+        task_id = create_resp.get_json()["task_id"]
+        
+        # Soft delete first
+        self.client.delete(f"/api/tasks/{task_id}")
+        
+        # Purge permanently
+        purge_resp = self.client.delete(f"/api/tasks/{task_id}/permanent")
+        self.assertEqual(purge_resp.status_code, 200)
+        
+        # Verify task is gone
+        get_resp = self.client.get(f"/api/tasks/{task_id}")
+        self.assertEqual(get_resp.status_code, 404)
+        
+        # Verify history logs are purged
+        hist_resp = self.client.get(f"/api/tasks/{task_id}/history")
+        self.assertEqual(len(hist_resp.get_json()), 0)
+
+    def test_ai_task_analyzer_sync(self) -> None:
+        """Verifies synchronous creation runs analyzer heuristics based on title."""
+        payload = {"title": "caffeine coffee run tomorrow urgent #work"}
+        create_resp = self.client.post("/api/tasks", json=payload)
+        self.assertEqual(create_resp.status_code, 201)
+        
+        task = create_resp.get_json()
+        self.assertEqual(task["priority"], "HIGH")
+        self.assertIn("Beverage", task["task_specific_tags"])
+        self.assertIn("Caffeine", task["task_specific_tags"])
+        self.assertIn("Work", task["task_specific_tags"])
+        self.assertIsNotNone(task["due_date"])
+        self.assertIn("AI-generated details", task["description"])
+
+    def test_ai_task_analyzer_async_service(self) -> None:
+        """Verifies AiTaskAnalyzerService background scanner detects pending tasks."""
+        from services import AiTaskAnalyzerService
+        test_db = "db_unit_test.json"
+        
+        # Seed test task
+        with DatabaseContext(test_db) as db:
+            db._tasks.clear()
+            db._history.clear()
+            task = Task(title="urgent backup plex server today")
+            db.tasks.add(task)
+            
+        analyzer = AiTaskAnalyzerService(test_db)
+        analyzer.analyze_pending_tasks()
+        
+        # Verify task was processed and updated
+        with DatabaseContext(test_db) as db:
+            updated = db.tasks.get(task.task_id)
+            self.assertEqual(updated.priority, "HIGH")
+            self.assertIn("Plex", updated.task_specific_tags)
+            self.assertIsNotNone(updated.due_date)
+            self.assertTrue(updated.app_features_placeholder.get("ai_analyzed"))
+            
+        import os
+        if os.path.exists(test_db):
+            os.remove(test_db)
+
 
 
 

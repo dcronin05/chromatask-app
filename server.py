@@ -128,6 +128,20 @@ def delete_task(task_id: str) -> Any:
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/tasks/<task_id>/permanent", methods=["DELETE"])
+def delete_task_permanently(task_id: str) -> Any:
+    """
+    Permanently deletes a task and all history events associated with it.
+    """
+    try:
+        task_service.delete_task_permanently(task_id)
+        return jsonify({"message": "Task permanently deleted"}), 200
+    except ValueError as ve:
+        return jsonify({"error": str(ve)}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/tasks/<task_id>/restore", methods=["POST"])
 def restore_task(task_id: str) -> Any:
     """
@@ -384,5 +398,7 @@ if __name__ == "__main__":
         code_doc_service.sync_dynamic_docs()
     except Exception as e:
         print(f"Failed to perform startup dynamic docs sync: {e}")
+    # Start background AI task analyzer daemon thread
+    task_service.ai_analyzer.start()
     # Run server locally on port 5000
     app.run(host="127.0.0.1", port=5000, debug=True)

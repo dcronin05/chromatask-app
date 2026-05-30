@@ -60,6 +60,7 @@ The programmatic documentation and linter console uses the **Strategy Pattern** 
 - **`CSSCodeAnalyzer`**: Audits CSS stylesheets for theme and variable conformity.
 - **`HTMLCodeAnalyzer`**: Audits HTML markup for accessibility and style conformance.
 - **`DocService`**: Orchestrates scanning the project, mapping extensions (e.g. `.py` ➜ `PythonCodeAnalyzer`, `.js` ➜ `JSCodeAnalyzer`, etc.), and building a unified codebase dashboard.
+- **AST API Route Parser**: Extends `DocService` to dynamically parse `server.py` using Python's standard `ast` module (`get_api_endpoints()`). It extracts route paths, HTTP methods, and endpoint docstrings to feed the frontend's **API Reference** subtab in real-time.
 
 ---
 
@@ -114,10 +115,10 @@ To prevent page reloads or server restarts from resetting the user's active cont
 <!-- DYNAMIC_API_REFERENCE_START -->
 ### 📊 Codebase Structural Summary
 - **Scanned Modules**: 8 files
-- **Detected Classes**: 15 classes
-- **Total Methods/Functions**: 114 methods
-- **Lines of Code**: 7752 lines (Comments: 294 lines)
+- **Detected Classes**: 16 classes
+- **Total Methods/Functions**: 128 methods
+- **Lines of Code**: 8006 lines (Comments: 297 lines)
 
-*Documentation compiled from Git HEAD:* `ae12d0d` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `9ddcf80` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_API_REFERENCE_END -->
 
