@@ -75,9 +75,9 @@ The Dev Docs & Health console is backed by the following server routes:
 ### 🛡️ Code Health Scorecard
 - **Code Quality Score**: **100%**
 - **Active Linter Warnings**: 1 active warnings
-- **Unit Tests Success Rate**: **100%** (37/37 Passed, 0 Failed)
-- **Test Execution Duration**: 0.3127s
+- **Unit Tests Success Rate**: **11%** (4/37 Passed, 0 Failed)
+- **Test Execution Duration**: 0.0002s
 
-*Documentation compiled from Git HEAD:* `9ddcf80` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `1b652d3` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_HEALTH_SCORECARD_END -->
 

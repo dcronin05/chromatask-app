@@ -119,6 +119,6 @@ To prevent page reloads or server restarts from resetting the user's active cont
 - **Total Methods/Functions**: 128 methods
 - **Lines of Code**: 8006 lines (Comments: 297 lines)
 
-*Documentation compiled from Git HEAD:* `9ddcf80` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `1b652d3` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_API_REFERENCE_END -->
 
