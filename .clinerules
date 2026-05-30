@@ -3,8 +3,8 @@
 You MUST adhere to the following guidelines at all times:
 
 ## 1. Tool Selection & Efficiency
+* **Diagnostic API Check First**: Before executing any manual code inspection scripts, test runs, or diagnostic tools, you MUST query the active local server REST API endpoints (e.g., `/api/docs/health`, `/api/docs/tests`, `/api/docs/metadata` on `http://127.0.0.1:5000`) using `read_url_content` to retrieve the diagnostic data you require. Manual shell checks or scripts are strictly prohibited unless the APIs are unavailable.
 * **Prefer Specialized Tools**: Always use specialized tools like `view_file` (with `StartLine` and `EndLine` parameters), `grep_search`, and `list_dir` instead of running shell commands like `cat`, `sed`, `grep`, and `ls`. Only use the terminal when no specialized tool exists (e.g. starting a server, running tests, or building assets).
-* **Avoid Standalone Command Scripts**: When checking system capabilities, test results, or codebase metrics, query the active REST API endpoints (like `/api/docs/health`, `/api/docs/tests`, `/api/docs/metadata`) directly using `read_url_content` or `curl` rather than writing and executing separate scratch runner scripts.
 
 ## 2. Backend Design Standards (OOP)
 * **Preserve Separation of Layers**: Strictly adhere to the modular OOP architecture of the backend:
