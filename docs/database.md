@@ -33,7 +33,11 @@ Contains the active and archived tasks in the system:
   - `timestamp` (str): Format `[MM:SS]` or `[HH:MM:SS]`.
   - `label` (str): Bookmark name.
   - `note` (str | null): Optional description notes.
-* `metadata` (dict): Extensible metadata dictionary for custom application features, AI-generated analysis records, and metadata parameters.
+* `metadata` (dict): Extensible metadata dictionary containing:
+  - `ai_analyzed` (bool): True if the task has been analyzed by the background scanner.
+  - `ai_analyzed_title` (str): The task title that was evaluated during the last analyzer run.
+  - `ai_analyzed_version` (int): Analyzer implementation schema version.
+  - `ai_data` (dict): Raw JSON response payload returned by the Cloud AI (Gemini) model (or fallback local heuristics), stored to facilitate future interpretation.
 
 ### B. The History Schema (Audit Log)
 Tracks every modification made to any task:
