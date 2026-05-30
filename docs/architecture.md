@@ -115,10 +115,10 @@ To prevent page reloads or server restarts from resetting the user's active cont
 <!-- DYNAMIC_API_REFERENCE_START -->
 ### 📊 Codebase Structural Summary
 - **Scanned Modules**: 8 files
-- **Detected Classes**: 16 classes
-- **Total Methods/Functions**: 128 methods
-- **Lines of Code**: 8006 lines (Comments: 297 lines)
+- **Detected Classes**: 18 classes
+- **Total Methods/Functions**: 185 methods
+- **Lines of Code**: 8195 lines (Comments: 298 lines)
 
-*Documentation compiled from Git HEAD:* `1b652d3` (Daniel Cronin on 2026-05-29)
+*Documentation compiled from Git HEAD:* `a969372` (Daniel Cronin on 2026-05-29)
 <!-- DYNAMIC_API_REFERENCE_END -->
 

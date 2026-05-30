@@ -423,6 +423,52 @@ class DocServiceTests(unittest.TestCase):
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    def test_js_code_analyzer_parsing(self) -> None:
+        """Verifies JSCodeAnalyzer parses classes, JSDocs, and standalones."""
+        from doc_service import JSCodeAnalyzer
+        code = (
+            "/**\n"
+            " * A test class.\n"
+            " */\n"
+            "class Calculator {\n"
+            "  /**\n"
+            "   * Adds two numbers.\n"
+            "   */\n"
+            "  add(x, y) {\n"
+            "    return x + y;\n"
+            "  }\n"
+            "}\n"
+            "// Standalone sum\n"
+            "function sum(a, b) {\n"
+            "  return a + b;\n"
+            "}\n"
+            "const arrowMultiply = (m, n) => m * n;\n"
+        )
+        temp_path = "temp_test_js_parser.js"
+        with open(temp_path, "w", encoding="utf-8") as f:
+            f.write(code)
+        try:
+            analyzer = JSCodeAnalyzer(temp_path)
+            report = analyzer.analyze()
+            classes = report["metadata"]["classes"]
+            self.assertEqual(len(classes), 2)
+            calc = next(c for c in classes if c["name"] == "Calculator")
+            self.assertEqual(calc["docstring"], "A test class.")
+            self.assertEqual(len(calc["methods"]), 1)
+            self.assertEqual(calc["methods"][0]["name"], "add")
+            self.assertEqual(calc["methods"][0]["args"], ["x", "y"])
+            self.assertEqual(calc["methods"][0]["docstring"], "Adds two numbers.")
+            module_class = next(c for c in classes if c["name"] == "temp_test_js_parser.js Module")
+            self.assertEqual(len(module_class["methods"]), 2)
+            s_fn = next(m for m in module_class["methods"] if m["name"] == "sum")
+            self.assertEqual(s_fn["docstring"], "Standalone sum")
+            self.assertEqual(s_fn["args"], ["a", "b"])
+            arrow_fn = next(m for m in module_class["methods"] if m["name"] == "arrowMultiply")
+            self.assertEqual(arrow_fn["args"], ["m", "n"])
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
 
 class TestRunnerServiceTests(unittest.TestCase):
     """

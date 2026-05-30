@@ -336,10 +336,14 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
         warnings = self._scan_warnings(lines)
         score = self._calculate_score(warnings)
 
+        # Extract JS classes and standalone functions
+        classes, standalones = self._scan_js_structures(lines)
+        classes_metadata = self._build_js_metadata_report(classes, standalones)
+
         return {
             "metadata": {
                 "file_name": os.path.basename(self.file_path),
-                "classes": [],
+                "classes": classes_metadata,
                 "stats": {
                     "lines": len(lines),
                     "comments": comment_lines
@@ -350,6 +354,190 @@ class JSCodeAnalyzer(BaseCodeAnalyzer):
                 "warnings": warnings
             }
         }
+
+    def _clean_js_line(self, line: str) -> str:
+        """Strips inline comments and string literals to normalize line."""
+        line = re.sub(r"//.*$", "", line)
+        line = re.sub(r'"[^"\\]*(?:\\.[^"\\]*)*"', '""', line)
+        line = re.sub(r"'[^'\\]*(?:\\.[^'\\]*)*'", "''", line)
+        line = re.sub(r"`[^`\\]*(?:\\.[^`\\]*)*`", "``", line)
+        return line
+
+    def _extract_jsdoc(self, lines: List[str], index: int) -> str:
+        """Extracts docstring/comment block preceding index looking back up to 12 lines."""
+        preceding_idx = index - 1
+        if preceding_idx < 0:
+            return ""
+        prev_line = lines[preceding_idx].strip()
+        is_cmt = prev_line.startswith("//") or prev_line.startswith("/*")
+        is_cmt_cont = prev_line.startswith("*") or prev_line.endswith("*/")
+        if not (is_cmt or is_cmt_cont):
+            return ""
+        start_idx = preceding_idx
+        while start_idx >= max(0, index - 12):
+            line = lines[start_idx].strip()
+            line_is_cmt = line.startswith("//") or line.startswith("/*")
+            line_is_cmt_cont = line.startswith("*") or line.endswith("*/") or "*/" in line
+            if line_is_cmt or line_is_cmt_cont:
+                start_idx -= 1
+            else:
+                break
+        raw_lines = []
+        for k in range(start_idx + 1, preceding_idx + 1):
+            line = lines[k].strip()
+            if line.startswith("/**"):
+                line = line[3:]
+            elif line.startswith("/*"):
+                line = line[2:]
+            if line.endswith("*/"):
+                line = line[:-2]
+            if line.startswith("*"):
+                line = line[1:]
+            if line.startswith("//"):
+                line = line[2:]
+            cleaned = line.strip()
+            if cleaned and not cleaned.startswith("@"):
+                raw_lines.append(cleaned)
+        return " ".join(raw_lines).strip()
+
+    def _parse_js_class(self, line: str, line_no: int, lines: List[str]) -> Optional[Dict[str, Any]]:
+        """Parses ES6 class definition and extracts class name and docstring."""
+        match = re.search(r"\bclass\s+([a-zA-Z0-9_$]+)", line)
+        if not match:
+            return None
+        class_name = match.group(1)
+        docstring = self._extract_jsdoc(lines, line_no - 1)
+        return {
+            "name": class_name,
+            "docstring": docstring,
+            "methods": []
+        }
+
+    def _parse_js_method(self, line: str, line_no: int, lines: List[str]) -> Optional[Dict[str, Any]]:
+        """Parses ES6 class method name, docstring, args, line, and length."""
+        match = re.search(r"^\s*(?:async\s+|static\s+|\*\s*)*([a-zA-Z0-9_$]+)\s*\(([^)]*)\)", line)
+        if not match:
+            return None
+        name = match.group(1)
+        if name in ("if", "for", "while", "switch", "catch", "function", "return"):
+            return None
+        has_brace = False
+        for idx in range(line_no - 1, min(len(lines), line_no + 3)):
+            if "{" in lines[idx]:
+                has_brace = True
+                break
+        if not has_brace:
+            return None
+        args = [a.strip() for a in match.group(2).split(",") if a.strip()]
+        docstring = self._extract_jsdoc(lines, line_no - 1)
+        length = self._get_function_length(lines, line_no - 1)
+        return {
+            "name": name,
+            "docstring": docstring,
+            "args": args,
+            "line": line_no,
+            "length": length
+        }
+
+    def _parse_standalone_function(self, line: str, line_no: int, lines: List[str]) -> Optional[Dict[str, Any]]:
+        """Parses standalone or arrow function definitions."""
+        match = re.search(r"\b(?:async\s+)?function\s+([a-zA-Z0-9_$]+)\s*\(([^)]*)\)", line)
+        if not match:
+            match = re.search(r"\b(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?\(([^)]*)\)\s*=>", line)
+        if not match:
+            match = re.search(r"\b(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=\s*(?:async\s*)?([a-zA-Z0-9_$]+)\s*=>", line)
+            if match:
+                name, args = match.group(1), [match.group(2).strip()]
+            else:
+                return None
+        else:
+            name, args = match.group(1), [a.strip() for a in match.group(2).split(",") if a.strip()]
+        if name in ("if", "for", "while", "switch", "catch", "function", "return"):
+            return None
+        docstring = self._extract_jsdoc(lines, line_no - 1)
+        length = self._get_function_length(lines, line_no - 1)
+        return {
+            "name": name,
+            "docstring": docstring,
+            "args": args,
+            "line": line_no,
+            "length": length
+        }
+
+    def _handle_non_class_line(
+        self, line: str, line_no: int, lines: List[str], cleaned: str, brace_level: int,
+        classes_metadata: List[Dict[str, Any]], standalone_functions: List[Dict[str, Any]]
+    ) -> Tuple[Optional[Dict[str, Any]], int]:
+        """Handles line when outside class context, looking for class or standalone function."""
+        class_info = self._parse_js_class(line, line_no, lines)
+        if class_info:
+            class_info["awaiting_brace"] = True
+            classes_metadata.append(class_info)
+            if "{" in cleaned:
+                class_info["awaiting_brace"] = False
+                class_info["start_brace_level"] = brace_level
+                brace_level += cleaned.count("{") - cleaned.count("}")
+            return class_info, brace_level
+        func_info = self._parse_standalone_function(line, line_no, lines)
+        if func_info:
+            standalone_functions.append(func_info)
+        return None, brace_level
+
+    def _scan_js_structures(self, lines: List[str]) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Scans JavaScript lines to extract actual classes and standalone functions."""
+        classes_metadata = []
+        standalone_functions = []
+        current_class = None
+        brace_level = 0
+        in_block_comment = False
+        for i, line in enumerate(lines):
+            line_no = i + 1
+            line_strip = line.strip()
+            if in_block_comment:
+                if "*/" in line_strip:
+                    in_block_comment = False
+                continue
+            if line_strip.startswith("/*"):
+                if "*/" not in line_strip:
+                    in_block_comment = True
+                continue
+            if line_strip.startswith("//"):
+                continue
+            cleaned = self._clean_js_line(line)
+            if current_class:
+                opened, closed = cleaned.count("{"), cleaned.count("}")
+                if current_class.get("awaiting_brace", True):
+                    if "{" in cleaned:
+                        current_class["awaiting_brace"] = False
+                        current_class["start_brace_level"] = brace_level
+                        brace_level += opened - closed
+                    continue
+                method_info = self._parse_js_method(line, line_no, lines)
+                if method_info:
+                    current_class["methods"].append(method_info)
+                brace_level += opened - closed
+                if brace_level <= current_class["start_brace_level"]:
+                    current_class = None
+            else:
+                current_class, brace_level = self._handle_non_class_line(
+                    line, line_no, lines, cleaned, brace_level, classes_metadata, standalone_functions
+                )
+        return classes_metadata, standalone_functions
+
+    def _build_js_metadata_report(self, classes_metadata: List[Dict[str, Any]], standalone_functions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Constructs list of metadata classes including a virtual module class for standalones."""
+        for cls in classes_metadata:
+            cls.pop("start_brace_level", None)
+            cls.pop("awaiting_brace", None)
+        if standalone_functions:
+            filename = os.path.basename(self.file_path)
+            virtual_class = {
+                "name": f"{filename} Module",
+                "docstring": f"Contains standalone functions in {filename}.",
+                "methods": standalone_functions
+            }
+            classes_metadata.append(virtual_class)
+        return classes_metadata
 
     def _read_content(self) -> str:
         """Reads file content from git commit or local filesystem."""

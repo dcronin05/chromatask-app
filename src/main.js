@@ -1277,6 +1277,7 @@ function renderClassExplorerData(data) {
         <div class="class-docstring">"${cls.docstring.trim()}"</div>
       ` : '';
 
+      const isJS = file.file_name.endsWith('.js');
       const methodsHTML = cls.methods.length > 0 ? `
         <div class="class-methods-section">
           <span class="class-methods-title">Methods</span>
@@ -1285,7 +1286,7 @@ function renderClassExplorerData(data) {
               <div class="method-item">
                 <div class="method-item-header">
                   <span class="method-signature">
-                    def <span class="method-name">${m.name}</span>(<span class="method-args">${m.args.join(', ')}</span>)
+                    ${isJS ? 'function' : 'def'} <span class="method-name">${m.name}</span>(<span class="method-args">${m.args.join(', ')}</span>)
                   </span>
                   <span class="method-line-badge">Line ${m.line}</span>
                 </div>
