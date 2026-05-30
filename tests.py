@@ -623,19 +623,36 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertEqual(sync_resp.status_code, 200)
         self.assertEqual(sync_resp.get_json()["status"], "success")
 
-        # Fetch architecture guide to verify API Reference section was compiled
+        # Fetch architecture guide to verify API Reference structural summary was compiled
         arch_resp = self.client.get("/api/docs/guides/architecture")
         self.assertEqual(arch_resp.status_code, 200)
         arch_content = arch_resp.get_json()["content"]
         self.assertIn("Programmatic API Reference", arch_content)
-        self.assertIn("PythonCodeAnalyzer", arch_content)
-        self.assertIn("BaseCodeAnalyzer", arch_content)
+        self.assertIn("Codebase Structural Summary", arch_content)
+        self.assertIn("Scanned Modules", arch_content)
+        self.assertIn("Total Methods/Functions", arch_content)
 
-        # Fetch testing guide to verify Codebase Health & Test scorecard was compiled
+        # Fetch testing guide to verify Code Health scorecard was compiled
         test_resp = self.client.get("/api/docs/guides/testing")
         self.assertEqual(test_resp.status_code, 200)
         test_content = test_resp.get_json()["content"]
         self.assertIn("Codebase Health & Test Execution Scorecard", test_content)
-        self.assertIn("Codebase Quality Score", test_content)
+        self.assertIn("Code Health Scorecard", test_content)
+        self.assertIn("Code Quality Score", test_content)
+        self.assertIn("Unit Tests Success Rate", test_content)
+
+    def test_get_api_endpoints_endpoint(self) -> None:
+        """Verifies GET /api/docs/endpoints dynamically parses and returns routes."""
+        resp = self.client.get("/api/docs/endpoints")
+        self.assertEqual(resp.status_code, 200)
+        endpoints = resp.get_json()
+        self.assertIsInstance(endpoints, list)
+        
+        # Check that standard routes exist in the response
+        paths = [e["path"] for e in endpoints]
+        self.assertIn("/api/tasks", paths)
+        self.assertIn("/api/docs/endpoints", paths)
+        self.assertIn("/api/docs/health", paths)
+
 
 

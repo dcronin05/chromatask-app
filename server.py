@@ -299,6 +299,18 @@ def sync_docs_endpoint() -> Any:
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/docs/endpoints", methods=["GET"])
+def get_api_endpoints_endpoint() -> Any:
+    """
+    Retrieves a dynamically generated list of API endpoints parsed from server.py.
+    """
+    try:
+        endpoints = code_doc_service.get_api_endpoints()
+        return jsonify(endpoints), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/docs/tests/metrics/<metric_name>", methods=["GET"])
 def get_test_metric(metric_name: str) -> Any:
     """

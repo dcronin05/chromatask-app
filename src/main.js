@@ -1291,20 +1291,9 @@ async function loadApiReference() {
   tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 24px;">Loading specifications...</td></tr>';
 
   try {
-    const endpoints = [
-      { path: '/api/tasks', method: 'GET', desc: 'Queries active tasks list (or archived if include_deleted=true).' },
-      { path: '/api/tasks', method: 'POST', desc: 'Creates a new task. Requires a JSON body (title is mandatory) and logs a CREATED event.' },
-      { path: '/api/tasks/<id>', method: 'GET', desc: 'Queries a single task object by ID.' },
-      { path: '/api/tasks/<id>', method: 'PUT', desc: 'Updates task values. Diffs inputs against current data and auto-logs UPDATED logs detailing differences.' },
-      { path: '/api/tasks/<id>', method: 'DELETE', desc: 'Soft-deletes task (sets is_deleted = true) and logs a DELETED event.' },
-      { path: '/api/tasks/<id>/restore', method: 'POST', desc: 'Restores a soft-deleted task back to the Kanban board and logs a RESTORED event.' },
-      { path: '/api/tasks/<id>/history', method: 'GET', desc: 'Fetches the chronological audit timeline history logs for a task.' },
-      { path: '/api/reset', method: 'POST', desc: 'Wipes all database tasks and history logs, leaving a blank canvas.' },
-      { path: '/api/docs/metadata', method: 'GET', desc: 'Dynamically parses codebase modules (using python ast) and reflects OOP class metadata.' },
-      { path: '/api/docs/health', method: 'GET', desc: 'Compiles real-time AST syntax lint warnings and calculates a codebase quality score.' },
-      { path: '/api/docs/guides', method: 'GET', desc: 'Returns a list of available static guide filenames.' },
-      { path: '/api/docs/guides/<name>', method: 'GET', desc: 'Reads and retrieves guide contents.' }
-    ];
+    const response = await fetch('/api/docs/endpoints');
+    if (!response.ok) throw new Error();
+    const endpoints = await response.json();
 
     tbody.innerHTML = '';
     endpoints.forEach(e => {
@@ -1316,7 +1305,8 @@ async function loadApiReference() {
       `;
       tbody.appendChild(tr);
     });
-  } catch (e) {
+  } catch (error) {
+    console.error(error);
     tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #f43f5e; padding: 24px;">Failed to load API Reference.</td></tr>';
   }
 }
