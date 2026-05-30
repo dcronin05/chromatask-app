@@ -1,4 +1,5 @@
 import datetime
+import os
 import re
 import threading
 import time
@@ -351,17 +352,16 @@ class AiTaskAnalyzerService:
         return None, None, None
 
     def _generate_description(self, title: str, update_data: Dict[str, Any]) -> str:
-        """Synthesizes a descriptive text summary explaining the AI configurations applied."""
-        desc_parts = [f"AI-generated details for: '{title}'."]
-        if "priority" in update_data:
-            desc_parts.append(f"Priority evaluated as {update_data['priority']}.")
-        if "task_specific_tags" in update_data:
-            tags_str = ", ".join(update_data["task_specific_tags"])
-            desc_parts.append(f"Auto-tagged: {tags_str}.")
-        if "due_date" in update_data:
-            desc_parts.append("Set due date calendar reminder.")
+        """Synthesizes a descriptive text summary explaining the task details."""
+        desc_parts = []
         if "media_metadata" in update_data:
-            desc_parts.append("Attached CCF cheetah co-watch video.")
+            desc_parts.append("Cheetah conservation and zoology co-watching session with video and bookmarks.")
+        elif "task_specific_tags" in update_data and any(t in update_data["task_specific_tags"] for t in ["Beverage", "Caffeine"]):
+            desc_parts.append("Prepare and enjoy a fresh coffee or tea beverage.")
+        elif "task_specific_tags" in update_data and any(t in update_data["task_specific_tags"] for t in ["Plex", "Server"]):
+            desc_parts.append("Retrieve and backup media files to the local Plex server archive.")
+        else:
+            desc_parts.append(f"Task checklist item: {title}.")
         return " ".join(desc_parts)
 
     def _capitalize_sentences(self, text: str) -> str:
@@ -383,33 +383,80 @@ class AiTaskAnalyzerService:
                     result.append(part)
         return "".join(result)
 
-    def analyze_task(self, task: Task, db: DatabaseContext, during_creation: bool = False) -> bool:
-        """Main orchestrator parsing a task's title and applying fields changes."""
-        title_lower = task.title.lower()
-        update_data: Dict[str, Any] = {}
+    def _call_gemini_api(self, title: str, api_key: str) -> Optional[Dict[str, Any]]:
+        """Calls the Gemini API to analyze the task title and return structured metadata."""
+        import urllib.request
+        import json
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        prompt = (
+            f"Analyze this task title: '{title}'. "
+            "Generate task details and return a JSON object with the keys: "
+            "'priority' (must be one of 'LOW', 'MEDIUM', 'HIGH'), "
+            "'tags' (list of strings, do not include hashtags), "
+            "'due_date' (ISO 8601 string or null), and "
+            "'description' (a clear, high-quality description sentence of the task). "
+            "Do not qualify the description with 'AI-generated' or similar phrases."
+        )
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {"responseMimeType": "application/json"}
+        }
+        try:
+            req = urllib.request.Request(
+                url, data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}, method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5.0) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                text_content = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                return json.loads(text_content)
+        except Exception as e:
+            print(f"Gemini API call failed: {e}")
+            return None
 
+    def _apply_gemini_results(self, task: Task, res: Dict[str, Any], update_data: Dict[str, Any]) -> None:
+        """Applies structured details returned from the Gemini API model."""
         cap_title = self._capitalize_sentences(task.title)
         if cap_title != task.title:
             update_data["title"] = cap_title
+        priority = res.get("priority")
+        if priority in ("LOW", "MEDIUM", "HIGH") and task.priority != priority:
+            update_data["priority"] = priority
+        tags = res.get("tags")
+        if isinstance(tags, list):
+            clean_tags = list(task.task_specific_tags)
+            for t in tags:
+                t_str = str(t).strip()
+                if t_str and t_str not in clean_tags:
+                    clean_tags.append(t_str)
+            if clean_tags != task.task_specific_tags:
+                update_data["task_specific_tags"] = clean_tags
+        due = res.get("due_date")
+        if due and task.due_date != due:
+            update_data["due_date"] = due
+        desc = res.get("description")
+        if desc and (not task.description or not task.description.strip()):
+            update_data["description"] = self._capitalize_sentences(str(desc).strip())
 
+    def _apply_heuristic_results(self, task: Task, title_lower: str, update_data: Dict[str, Any]) -> None:
+        """Applies local keyword-based heuristic parsing when API key is missing."""
+        cap_title = self._capitalize_sentences(task.title)
+        if cap_title != task.title:
+            update_data["title"] = cap_title
         priority = self._parse_priority(title_lower)
         if priority and task.priority != priority:
             update_data["priority"] = priority
-
         tags = self._parse_tags(title_lower, task.task_specific_tags)
         if tags != task.task_specific_tags:
             update_data["task_specific_tags"] = tags
-
         due = self._parse_due_date(title_lower)
         if due and task.due_date != due:
             update_data["due_date"] = due
-
         att_type, media, bookmarks = self._parse_media_and_bookmarks(title_lower)
         if att_type and not task.attachment_type:
             update_data["attachment_type"] = att_type
             update_data["media_metadata"] = media
             update_data["curated_video_bookmarks"] = bookmarks
-
         if not task.description or not task.description.strip():
             desc = self._generate_description(update_data.get("title", task.title), update_data)
             update_data["description"] = desc
@@ -418,12 +465,21 @@ class AiTaskAnalyzerService:
             if cap_desc != task.description:
                 update_data["description"] = cap_desc
 
+    def analyze_task(self, task: Task, db: DatabaseContext, during_creation: bool = False) -> bool:
+        """Main orchestrator parsing a task's title and applying fields changes."""
+        title_lower = task.title.lower()
+        update_data: Dict[str, Any] = {}
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        gemini_result = self._call_gemini_api(task.title, api_key) if api_key else None
+        if gemini_result:
+            self._apply_gemini_results(task, gemini_result, update_data)
+        else:
+            self._apply_heuristic_results(task, title_lower, update_data)
         placeholder = task.app_features_placeholder or {}
         placeholder["ai_analyzed_title"] = update_data.get("title", task.title)
         placeholder["ai_analyzed"] = True
         placeholder["ai_analyzed_version"] = 2
         task.app_features_placeholder = placeholder
-
         if update_data:
             diffs = task.update_fields(update_data)
             if diffs:

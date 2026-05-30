@@ -739,7 +739,7 @@ class FlaskAPIAdditionalTests(FlaskAPITests):
         self.assertIn("Caffeine", task["task_specific_tags"])
         self.assertIn("Work", task["task_specific_tags"])
         self.assertIsNotNone(task["due_date"])
-        self.assertIn("AI-generated details", task["description"])
+        self.assertGreater(len(task["description"]), 0)
 
     def test_ai_task_analyzer_async_service(self) -> None:
         """Verifies AiTaskAnalyzerService background scanner detects pending tasks."""
