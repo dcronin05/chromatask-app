@@ -1045,6 +1045,10 @@ async function openDetailDrawer(taskId) {
   if (drawer) drawer.classList.add('open');
 }
 
+/**
+ * Renders the AI insights panel containing suggested fields and raw AI response.
+ * @param {Object} task - The task object.
+ */
 function renderAiInsightsSection(task) {
   const container = document.getElementById('drawer-ai-insights-section');
   if (!container) return;

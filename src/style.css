@@ -37,6 +37,14 @@
   --grad-hover: linear-gradient(135deg, #0ea5e9 0%, #9333ea 100%);
   --grad-danger: linear-gradient(135deg, #f43f5e 0%, #e11d48 100%);
 
+  /* AI theme colors */
+  --color-ai-accent: #a78bfa;
+  --color-ai-accent-hover: #c084fc;
+  --color-ai-accent-active: #d8b4fe;
+  --bg-ai-accent-alpha: rgba(124, 58, 237, 0.05);
+  --bg-ai-accent-alpha-hover: rgba(124, 58, 237, 0.2);
+  --border-ai-accent-alpha: rgba(124, 58, 237, 0.15);
+
   /* Typography */
   --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-body: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -859,8 +867,8 @@ body {
 }
 
 .ai-insights-section {
-  background: rgba(124, 58, 237, 0.05);
-  border: 1px solid rgba(124, 58, 237, 0.15);
+  background: var(--bg-ai-accent-alpha);
+  border: 1px solid var(--border-ai-accent-alpha);
   border-radius: var(--radius-md);
   padding: 16px;
   margin-top: 8px;
@@ -872,7 +880,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #a78bfa; /* Lavender purple */
+  color: var(--color-ai-accent);
   font-family: var(--font-display);
   font-size: 14px;
   font-weight: 600;
@@ -887,7 +895,7 @@ body {
 
 .ai-insight-card {
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   padding: 10px;
   display: flex;
@@ -910,14 +918,14 @@ body {
 
 .json-viewer-container {
   margin-top: 12px;
-  border-top: 1px solid rgba(124, 58, 237, 0.1);
+  border-top: 1px solid var(--border-light);
   padding-top: 12px;
 }
 
 .btn-toggle-json {
-  background: rgba(124, 58, 237, 0.1);
-  border: 1px solid rgba(124, 58, 237, 0.2);
-  color: #c084fc;
+  background: var(--bg-ai-accent-alpha);
+  border: 1px solid var(--border-light);
+  color: var(--color-ai-accent-hover);
   padding: 6px 12px;
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -929,19 +937,19 @@ body {
 }
 
 .btn-toggle-json:hover {
-  background: rgba(124, 58, 237, 0.2);
-  border-color: rgba(124, 58, 237, 0.3);
-  color: #d8b4fe;
+  background: var(--bg-ai-accent-alpha-hover);
+  border-color: var(--border-hover);
+  color: var(--color-ai-accent-active);
 }
 
 .json-viewer {
   background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-light);
   border-radius: var(--radius-sm);
   padding: 12px;
   font-family: 'Fira Code', 'Courier New', monospace;
   font-size: 11px;
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   overflow-x: auto;
   margin-top: 8px;
   max-height: 250px;
